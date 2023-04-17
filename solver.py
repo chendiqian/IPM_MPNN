@@ -102,22 +102,23 @@ def ipm_chapter14(c, A_ub, b_ub, A_eq, b_eq, bounds, autoscale = False, max_iter
     for iteration in range(max_iter):
         try:
             _mu = mu(x, s)
-            S_inv = np.diag((s + SMALL_EPS) ** -1)
-            X = np.diag(x)
-            XS_inv = X @ S_inv
-            M = A @ XS_inv @ A.T
+            s_inv = (s + SMALL_EPS) ** -1
+            xs_inv = x * s_inv
+            A_XS_inv = A * xs_inv[None]
+            Ax = A @ x
+            M = A_XS_inv @ A.T
 
             if solver == 'cho':
                 c_and_lower = cho_factor(M)
 
             # affine
-            rhs = b - A @ x + A @ XS_inv @ (- A.T @ lambd + c)
+            rhs = b - Ax + A_XS_inv @ (- A.T @ lambd + c)
             if solver == 'cho':
                 grad_lambda_aff = cho_solve(c_and_lower, rhs)
             elif solver == 'lstsq':
                 grad_lambda_aff = lstsq(M, rhs)[0]
             grad_s_aff = - A.T @ (lambd + grad_lambda_aff) - s + c
-            grad_x_aff = -x - XS_inv @ grad_s_aff
+            grad_x_aff = -x - xs_inv * grad_s_aff
 
             alpha_prime_aff = 1.
             if np.any(grad_x_aff < 0):
@@ -132,15 +133,15 @@ def ipm_chapter14(c, A_ub, b_ub, A_eq, b_eq, bounds, autoscale = False, max_iter
                             s + alpha_dual_aff * grad_s_aff) / len(x)
             sigma = (mu_aff / _mu) ** 3
 
-            rhs = b - A @ x + A @ XS_inv @ (- A.T @ lambd + c) + A @ S_inv @ (
-                        grad_s_aff * grad_x_aff - sigma * _mu)
+            rhs = b - Ax + A_XS_inv @ (- A.T @ lambd + c) + A @ (s_inv * (
+                        grad_s_aff * grad_x_aff - sigma * _mu))
             if solver == 'cho':
                 grad_lambda = cho_solve(c_and_lower, rhs)
             elif solver == 'lstsq':
                 grad_lambda = lstsq(M, rhs)[0]
             grad_s = - A.T @ (lambd + grad_lambda) - s + c
-            grad_x = - S_inv @ (
-                        x * s + grad_s_aff * grad_x_aff - sigma * _mu) - XS_inv @ grad_s
+            grad_x = - s_inv * (
+                        x * s + grad_s_aff * grad_x_aff - sigma * _mu) - xs_inv * grad_s
 
             alpha_prime_max = 1.
             if np.any(grad_x < 0):
@@ -213,26 +214,31 @@ def ipm_overleaf(c, A_ub, b_ub, A_eq, b_eq, bounds, autoscale = False, max_iter 
 
     for iteration in range(max_iter):
         try:
-            S_inv = np.diag((s + SMALL_EPS) ** -1)
             s_inv = (s + SMALL_EPS) ** -1
-            X = np.diag(x)
-            XS_inv = X @ S_inv
-            M = A @ XS_inv @ A.T
+            xs_inv = x * s_inv
+            A_XS_inv = A * xs_inv[None]
+            M = A_XS_inv @ A.T
 
             if solver == 'cho':
                 c_and_lower = cho_factor(M)
 
-            rhs = b - A @ x + A @ XS_inv @ (- A.T @ lambd + c) - A @ s_inv * sigma * _mu
+            rhs = b - A @ x + A_XS_inv @ (- A.T @ lambd + c) - A @ s_inv * sigma * _mu
             if solver == 'cho':
                 grad_lambda = cho_solve(c_and_lower, rhs)
             elif solver == 'lstsq':
                 grad_lambda = lstsq(M, rhs)[0]
             AT_lambda_plut_dlambda = A.T @ (lambd + grad_lambda)
             grad_s = - AT_lambda_plut_dlambda - s + c
-            grad_x = s_inv * sigma * _mu + XS_inv @ (AT_lambda_plut_dlambda - c)
+            grad_x = s_inv * sigma * _mu + xs_inv * (AT_lambda_plut_dlambda - c)
 
-            alpha = min(1., 2 ** 1.5 / len(x) * (1 - gamma) * sigma / (
-                        sigma ** 2 / gamma - 2 * sigma + 1))
+            # alpha = min(1., 2 ** 1.5 / len(x) * (1 - gamma) * sigma / (
+            #             sigma ** 2 / gamma - 2 * sigma + 1))
+            
+            alpha = 1.
+            if np.any(grad_x < 0):
+                alpha = min(alpha, (-x[grad_x < 0] / grad_x[grad_x < 0]).min())
+            if np.any(grad_s < 0):
+                alpha = min(alpha, (-s[grad_s < 0] / grad_s[grad_s < 0]).min())
 
             x = x + alpha * grad_x
             lambd = lambd + alpha * grad_lambda
