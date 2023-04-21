@@ -4,14 +4,13 @@ import warnings
 from collections import namedtuple
 from copy import deepcopy
 
-import numba
-
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.linalg import cho_factor, cho_solve, lstsq
 from scipy.optimize._linprog_util import _clean_inputs, _presolve, _get_Abc, _autoscale, \
     _postsolve
 from scipy.sparse.linalg import cg as sp_cg
+from scipy.sparse import csr_matrix
 from tqdm import tqdm
 
 # https://github.com/scipy/scipy/blob/e574cbcabf8d25955d1aafeed02794f8b5f250cd/scipy/optimize/_linprog_util.py#L15
@@ -21,7 +20,6 @@ _LPProblem.__new__.__defaults__ = (None,) * 7  # make c the only required arg
 SMALL_EPS = 1.e-7
 
 
-@numba.njit(cache=True)
 def mu(x, s):
     return x.dot(s) / len(x)
 
@@ -61,7 +59,6 @@ def _get_blind_start(A, b, c, smart_start = True):
     return x0, lambda0, s0
 
 
-# @numba.njit(cache=True)
 # def conjugate_gradient(P, q, alpha, beta, max_iters = 10000, tol = 1.e-9):
 #
 #     y = q / np.diag(P)
@@ -78,7 +75,6 @@ def _get_blind_start(A, b, c, smart_start = True):
 #     return y
 
 
-@numba.njit(cache=True)
 def conjugate_gradient(P, q, max_iters = 10000, tol = 1.e-5):
 
     y = q / np.diag(P)
@@ -91,12 +87,12 @@ def conjugate_gradient(P, q, max_iters = 10000, tol = 1.e-5):
         if i == 1:
             p = r
         else:
-            beta = np.dot(r, np.dot(P, p)) / np.dot(p, np.dot(P, p))
+            beta = r.dot(P.dot(p)) / p.dot(P.dot(p))
             p = r - beta * p
 
-        alpha = np.dot(p, r) / np.dot(p, np.dot(P, p))
+        alpha = np.dot(p, r) / p.dot(P.dot(p))
         y = y + alpha * p
-    return y
+    return y, i
 
 
 def ipm_chapter14(c, A_ub, b_ub, A_eq, b_eq, bounds, autoscale = False, max_iter = 100, tol = 1.e-6):
@@ -264,28 +260,33 @@ def ipm_overleaf(c,
 
     x, lambd, s = _get_blind_start(A, b, c)
 
+    A_sparse = csr_matrix(A)
+
     _mu = mu(x, s)
     last_x = x
 
-    for iteration in tqdm(range(max_iter)):
+    pbar = tqdm(range(max_iter))
+    for iteration in pbar:
         try:
             s_inv = (s + SMALL_EPS) ** -1
             xs_inv = x * s_inv
             A_XS_inv = A * xs_inv[None]
             M = A_XS_inv @ A.T
 
-            rhs = b - A @ x + A_XS_inv @ (- A.T @ lambd + c) - A @ s_inv * sigma * _mu
+            rhs = b - A_sparse @ x + A_XS_inv @ (- A_sparse.T @ lambd + c) - A_sparse @ s_inv * sigma * _mu
             if lin_solver == 'cho':
                 c_and_lower = cho_factor(M)
                 grad_lambda = cho_solve(c_and_lower, rhs)
+                lin_system_steps = 0
             elif lin_solver == 'lstsq':
                 grad_lambda = lstsq(M, rhs)[0]
+                lin_system_steps = 0
             elif lin_solver == 'cg':
-                grad_lambda = conjugate_gradient(M, rhs, max_iters = 100000, tol=1.e-5)
+                grad_lambda, lin_system_steps = conjugate_gradient(M, rhs, max_iters = 100000, tol=1.e-5)
             elif lin_solver == 'scipy_cg':
-                grad_lambda, _ = sp_cg(M, rhs, tol=1.e-9)
+                grad_lambda, lin_system_steps = sp_cg(M, rhs, tol=1.e-9)
 
-            AT_lambda_plut_dlambda = A.T @ (lambd + grad_lambda)
+            AT_lambda_plut_dlambda = A_sparse.T @ (lambd + grad_lambda)
             grad_s = - AT_lambda_plut_dlambda - s + c
             grad_x = s_inv * sigma * _mu + xs_inv * (AT_lambda_plut_dlambda - c)
 
@@ -312,6 +313,8 @@ def ipm_overleaf(c,
         except (LinAlgError, FloatingPointError, ValueError, ZeroDivisionError):
             warnings.warn(f'Instability occured at iter {iteration}, turning to lstsq')
             lin_solver = 'lstsq'
+
+        pbar.set_postfix({'lin_system_steps': lin_system_steps})
 
     x, fun, slack, con = _postsolve(x, postsolve_args)
 
