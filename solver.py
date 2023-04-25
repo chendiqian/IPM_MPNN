@@ -59,20 +59,20 @@ def _get_blind_start(A, b, c, smart_start = True):
     return x0, lambda0, s0
 
 
-# def conjugate_gradient(P, q, alpha, beta, max_iters = 10000, tol = 1.e-9):
-#
-#     y = q / np.diag(P)
-#     p = np.zeros_like(q)
-#     last_y = y
-#     diag_Pinv = 1. / np.diag(P)
-#
-#     for i in range(1, max_iters + 1):
-#         r = q - P @ y
-#         p = diag_Pinv * r + beta * p
-#         y = y + alpha * p
-#         if np.abs(last_y - y).max() <= tol:
-#             break
-#     return y
+def conjugate_gradient_hyper(P, q, alpha, beta, max_iters = 10000, tol = 1.e-5):
+
+    y = q / np.diag(P)
+    p = np.zeros_like(q)
+    last_y = y
+    diag_Pinv = 1. / np.diag(P)
+
+    for i in range(1, max_iters + 1):
+        r = q - P @ y
+        p = diag_Pinv * r + beta * p
+        y = y + alpha * p
+        if np.abs(last_y - y).max() <= tol:
+            break
+    return y, i
 
 
 def conjugate_gradient(P, q, max_iters = 10000, tol = 1.e-5):
@@ -283,8 +283,13 @@ def ipm_overleaf(c,
                 lin_system_steps = 0
             elif lin_solver == 'cg':
                 grad_lambda, lin_system_steps = conjugate_gradient(M, rhs, max_iters = 100000, tol=1.e-5)
+            elif lin_solver == 'cg_hyper':
+                grad_lambda, lin_system_steps = conjugate_gradient_hyper(M, rhs, alpha=cg_alpha, beta=cg_beta, max_iters = 100000, tol=1.e-5)
             elif lin_solver == 'scipy_cg':
-                grad_lambda, lin_system_steps = sp_cg(M, rhs, tol=1.e-9)
+                grad_lambda = sp_cg(M, rhs, tol=1.e-9)
+                lin_system_steps = 0
+            else:
+                raise NotImplementedError
 
             AT_lambda_plut_dlambda = A_sparse.T @ (lambd + grad_lambda)
             grad_s = - AT_lambda_plut_dlambda - s + c
