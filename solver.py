@@ -4,6 +4,7 @@ import warnings
 from collections import namedtuple
 from copy import deepcopy
 
+from jax.ops import segment_min
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.linalg import cho_factor, cho_solve, lstsq
@@ -268,6 +269,12 @@ def ipm_overleaf(c,
     intermediate_xs = []
 
     pbar = tqdm(range(max_iter))
+    if step_method == 'neighbor_min':
+        adj_var = (A_sparse.T @ A_sparse).tocoo()
+        adj_var_row, adj_var_col = adj_var.row, adj_var.col
+        # adj_cons = (A_sparse @ A_sparse.T).tocoo()
+        # adj_cons_row, adj_cons_col = adj_cons.row, adj_cons.col
+
     for iteration in pbar:
         try:
             s_inv = (s + SMALL_EPS) ** -1
@@ -299,20 +306,42 @@ def ipm_overleaf(c,
 
             if step_method == 'conv':
                 alpha = min(1., 2 ** 1.5 / len(x) * (1 - gamma) * sigma / (sigma ** 2 / gamma - 2 * sigma + 1))
+                alpha_x = alpha_l = alpha_s = alpha
             elif step_method == 'line':
                 alpha = 1.
                 if np.any(grad_x < 0):
                     alpha = min(alpha, (-x[grad_x < 0] / grad_x[grad_x < 0]).min())
                 if np.any(grad_s < 0):
                     alpha = min(alpha, (-s[grad_s < 0] / grad_s[grad_s < 0]).min())
+                alpha_l = alpha_s = alpha_x = alpha
+            elif step_method == 'neighbor_min':
+                # alpha_x_msg = (x / grad_x + SMALL_EPS)[adj_var_col]
+                # alpha_x = np.where(grad_x[adj_var_col] < 0., -alpha_x_msg, 1.)
+                # alpha_x = np.array(segment_min(alpha_x, adj_var_row))
+                # alpha_x = np.minimum(alpha_x, 1.)
+
+                alpha_x_msg = (x / grad_x + SMALL_EPS)
+                alpha_x = np.where(grad_x < 0., np.abs(alpha_x_msg), 1.)
+                # alpha_x = np.array(segment_min(alpha_x, adj_var_row))
+                alpha_x = np.minimum(alpha_x, 1.) * 0.98
+
+                alpha_s_msg = (s / grad_s + SMALL_EPS)
+                alpha_s = np.where(grad_s < 0., np.abs(alpha_s_msg), 1.)
+                # alpha_s = np.array(segment_min(alpha_s, adj_var_row))
+                alpha_s = np.minimum(alpha_s, 1.) * 0.98
+
+                alpha_l = np.minimum(np.abs(lambd / grad_lambda), 1.)
             else:
                 raise ValueError
 
-            x = x + alpha * grad_x
-            lambd = lambd + alpha * grad_lambda
-            s = s + alpha * grad_s
+            x = x + alpha_x * grad_x
+            lambd = lambd + alpha_l * grad_lambda
+            s = s + alpha_s * grad_s
 
-            _mu *= (1 - (1 - sigma) * alpha)
+            if step_method != 'neighbor_min':
+                _mu *= (1 - (1 - sigma) * alpha_x)
+            else:
+                _mu = mu(x, s)
 
             if np.abs(x - last_x).max() < tol:
                 break
@@ -322,9 +351,8 @@ def ipm_overleaf(c,
             warnings.warn(f'Instability occured at iter {iteration}, turning to lstsq')
             lin_solver = 'lstsq'
 
-        pbar.set_postfix({'lin_system_steps': lin_system_steps})
-
-    x, fun, slack, con = _postsolve(x, postsolve_args)
+        x, fun, slack, con = _postsolve(x, postsolve_args)
+        pbar.set_postfix({'lin_system_steps': lin_system_steps, 'obj': fun})
 
     sol = {
         'x': x,
@@ -347,5 +375,5 @@ if __name__ == '__main__':
     b_eq = b.numpy()
     bounds = None
 
-    sol = ipm_chapter14(c, A_ub, b_ub, A_eq, b_eq, bounds)
+    sol = ipm_overleaf(c, A_ub, b_ub, A_eq, b_eq, bounds)
     print(sol['x'])
