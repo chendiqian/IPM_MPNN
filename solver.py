@@ -4,7 +4,7 @@ import warnings
 from collections import namedtuple
 from copy import deepcopy
 
-from jax.ops import segment_min
+# from jax.ops import segment_min
 import numpy as np
 from scipy.linalg import LinAlgError
 from scipy.linalg import cho_factor, cho_solve, lstsq
