@@ -264,6 +264,8 @@ def ipm_overleaf(c,
 
     _mu = mu(x, s)
     last_x = x
+    
+    intermediate_xs = []
 
     pbar = tqdm(range(max_iter))
     for iteration in pbar:
@@ -315,6 +317,7 @@ def ipm_overleaf(c,
             if np.abs(x - last_x).max() < tol:
                 break
             last_x = x
+            intermediate_xs.append(_postsolve(x, postsolve_args)[0])
         except (LinAlgError, FloatingPointError, ValueError, ZeroDivisionError):
             warnings.warn(f'Instability occured at iter {iteration}, turning to lstsq')
             lin_solver = 'lstsq'
@@ -325,6 +328,7 @@ def ipm_overleaf(c,
 
     sol = {
         'x': x,
+        'xs': intermediate_xs,
         'fun': fun,
         'slack': slack,
         'con': con,
