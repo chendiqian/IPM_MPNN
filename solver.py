@@ -136,7 +136,7 @@ def ipm_chapter14(c, A_ub, b_ub, A_eq, b_eq, bounds, autoscale = False, max_iter
         A, b, c, x0, C, b_scale = _autoscale(A, b, c, x0)
         postsolve_args = postsolve_args[:-2] + (C, b_scale)
 
-    x, lambd, s = _get_blind_start(A, b, c)
+    x, lambd, s = _get_blind_start(A, b, c, smart_start=False)
 
     last_x = x
     solver = 'cho'
@@ -346,7 +346,8 @@ def ipm_overleaf(c,
             if np.abs(x - last_x).max() < tol:
                 break
             last_x = x
-            intermediate_xs.append(_postsolve(x, postsolve_args)[0])
+            # intermediate_xs.append(_postsolve(x, postsolve_args)[0])
+            intermediate_xs.append((x, lambd, s))
         except (LinAlgError, FloatingPointError, ValueError, ZeroDivisionError):
             warnings.warn(f'Instability occured at iter {iteration}, turning to lstsq')
             lin_solver = 'lstsq'
