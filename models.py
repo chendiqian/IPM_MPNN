@@ -197,7 +197,7 @@ class DeepHeteroGNN(torch.nn.Module):
             x_dict = h
 
         cons, vals = zip(*hiddens)
-        vals = self.pred_vals(torch.stack(vals, dim=0))
+        vals = self.pred_vals(torch.stack(vals, dim=0))  # seq * #val * hidden
         cons = self.pred_cons(torch.stack(cons, dim=0))
 
-        return vals, cons.squeeze()
+        return torch.transpose(vals, 0, 1), cons.squeeze().T
