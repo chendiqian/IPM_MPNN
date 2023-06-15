@@ -58,14 +58,15 @@ class Trainer:
             vals, cons = model(data.x_dict, data.edge_index_dict)
             loss = self.criterion(vals[..., 0], data.gt_primals)
             scheduler.step(loss)
-            if loss < self.best_val_loss:
-                self.best_val_loss = loss
-                self.patience = 0
-            else:
-                self.patience += 1
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
-        return val_losses.item() / num_graphs
+        val_loss = val_losses.item() / num_graphs
+        if val_loss < self.best_val_loss:
+            self.best_val_loss = val_loss
+            self.patience = 0
+        else:
+            self.patience += 1
+        return val_loss
 
 
 if __name__ == '__main__':
@@ -101,6 +102,6 @@ if __name__ == '__main__':
                 break
 
             pbar.set_postfix({'train loss': train_loss, 'val loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
-        best_val_losses.append(trainer.best_val_loss.item())
+        best_val_losses.append(trainer.best_val_loss)
 
     print(f'best loss: {np.mean(best_val_losses)} ± {np.std(best_val_losses)}')
