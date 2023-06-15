@@ -57,10 +57,10 @@ class Trainer:
             data = data.to(self.device)
             vals, cons = model(data.x_dict, data.edge_index_dict)
             loss = self.criterion(vals[..., 0], data.gt_primals)
-            scheduler.step(loss)
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
+        scheduler.step(val_loss)
         if val_loss < self.best_val_loss:
             self.best_val_loss = val_loss
             self.patience = 0
