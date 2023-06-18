@@ -6,6 +6,7 @@ from torch import optim
 from torch_geometric.loader import DataLoader
 from torch_geometric.transforms import Compose
 from tqdm import tqdm
+import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
 from data.dataset import SetCoverDataset
@@ -22,6 +23,8 @@ def args_parser():
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--dropout', type=float, default=0.)
+    parser.add_argument('--wandbname', type=str, default='default')
+    parser.add_argument('--use_wandb', type=str, default=False)
     return parser.parse_args()
 
 
@@ -71,6 +74,10 @@ class Trainer:
 
 if __name__ == '__main__':
     args = args_parser()
+    wandb.init(project=args.wandbname, mode="online" if args.use_wandb else "disabled",
+               config=vars(args),
+               entity="ipmgnn")
+
     dataset = SetCoverDataset('instances/setcover',
                               transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
@@ -105,6 +112,7 @@ if __name__ == '__main__':
                 break
 
             pbar.set_postfix({'train loss': train_loss, 'val loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
+            wandb.log({'train loss': train_loss, 'val loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
         best_val_losses.append(trainer.best_val_loss)
 
     print(f'best loss: {np.mean(best_val_losses)} ± {np.std(best_val_losses)}')
