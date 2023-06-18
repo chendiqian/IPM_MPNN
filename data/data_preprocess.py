@@ -21,9 +21,9 @@ class HeteroAddLaplacianEigenvectorPE:
         vals_lap = (vals_lap - vals_lap.mean(0)) / vals_lap.std(0)
         obj_lap = lap[node_slices['obj'][0]: node_slices['obj'][1], :]
 
-        data['cons'].x = torch.cat([data['cons'].x, cons_lap], dim=1)
-        data['vals'].x = torch.cat([data['vals'].x, vals_lap], dim=1)
-        data['obj'].x = torch.cat([data['obj'].x, obj_lap], dim=1)
+        data['cons'].laplacian_eigenvector_pe = cons_lap
+        data['vals'].laplacian_eigenvector_pe = vals_lap
+        data['obj'].laplacian_eigenvector_pe = obj_lap
         return data
 
 
