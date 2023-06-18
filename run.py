@@ -40,7 +40,7 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             optimizer.zero_grad()
-            vals, cons = model(data.x_dict, data.edge_index_dict)
+            vals, cons = model(data)
             loss = self.criterion(vals[..., 0], data.gt_primals)
             loss.backward()
             optimizer.step()
@@ -55,7 +55,7 @@ class Trainer:
         num_graphs = 0
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
-            vals, cons = model(data.x_dict, data.edge_index_dict)
+            vals, cons = model(data)
             loss = self.criterion(vals[..., 0], data.gt_primals)
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
@@ -71,8 +71,10 @@ class Trainer:
 
 if __name__ == '__main__':
     args = args_parser()
-    dataset = SetCoverDataset('instances/setcover', pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
-                                                                           SubSample(args.ipm_steps)]))
+    dataset = SetCoverDataset('instances/setcover',
+                              transform=SubSample(args.ipm_steps),
+                              pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
+                                                     SubSample(32)]))
 
     train_loader = DataLoader(dataset[:800], batch_size=args.batchsize, shuffle=True)
     val_loader = DataLoader(dataset[800:900], batch_size=args.batchsize, shuffle=False)
@@ -82,7 +84,8 @@ if __name__ == '__main__':
     best_val_losses = []
 
     for run in range(args.runs):
-        model = DeepHeteroGNN(in_shape=args.lappe + 2,
+        model = DeepHeteroGNN(in_shape=2,
+                              pe_dim=args.lappe,
                               hid_dim=args.hidden,
                               num_layers=args.ipm_steps,
                               dropout=args.dropout,

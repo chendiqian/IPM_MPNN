@@ -136,7 +136,7 @@ class DeeperGCN(torch.nn.Module):
 
 
 class DeepHeteroGNN(torch.nn.Module):
-    def __init__(self, in_shape, hid_dim, num_layers, dropout, share_weight, use_norm, use_res):
+    def __init__(self, in_shape, pe_dim, hid_dim, num_layers, dropout, share_weight, use_norm, use_res):
         super().__init__()
 
         self.dropout = dropout
@@ -148,9 +148,13 @@ class DeepHeteroGNN(torch.nn.Module):
         self.gcns = torch.nn.ModuleList()
         self.norms = torch.nn.ModuleList()
 
-        self.encoder = torch.nn.ModuleDict({'vals': torch.nn.Linear(in_shape, hid_dim),
-                                            'cons': torch.nn.Linear(in_shape, hid_dim),
-                                            'obj': torch.nn.Linear(in_shape, hid_dim)})
+        self.encoder = torch.nn.ModuleDict({'vals': torch.nn.Linear(in_shape, hid_dim // 2),
+                                            'cons': torch.nn.Linear(in_shape, hid_dim // 2),
+                                            'obj': torch.nn.Linear(in_shape, hid_dim // 2)})
+
+        self.pe_encoder = torch.nn.ModuleDict({'vals': torch.nn.Linear(pe_dim, hid_dim // 2),
+                                            'cons': torch.nn.Linear(pe_dim, hid_dim // 2),
+                                            'obj': torch.nn.Linear(pe_dim, hid_dim // 2)})
 
         for layer in range(num_layers):
             if layer == 0 or not share_weight:
@@ -175,9 +179,14 @@ class DeepHeteroGNN(torch.nn.Module):
                                              torch.nn.ReLU(),
                                              torch.nn.Linear(hid_dim, 1))
 
-    def forward(self, x_dict, edge_index_dict):
+    def forward(self, data):
+        x_dict, edge_index_dict = data.x_dict, data.edge_index_dict
         for k in ['cons', 'vals', 'obj']:
-            x_dict[k] = torch.relu(self.encoder[k](x_dict[k]))
+            x_dict[k] = torch.relu(
+                torch.cat([self.encoder[k](x_dict[k]),
+                           0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
+                                  self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))], dim=1)
+            )
 
         hiddens = []
         for i in range(self.num_layers):
