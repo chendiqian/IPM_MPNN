@@ -1,6 +1,5 @@
 from torch_geometric.nn.conv import HeteroConv, GENConv
 import torch
-from torch.nn import BatchNorm1d, LayerNorm
 import torch.nn.functional as F
 
 
@@ -11,11 +10,9 @@ class ParallelHeteroGNN(torch.nn.Module):
         self.dropout = dropout
         self.share_weight = share_weight
         self.num_layers = num_layers
-        self.use_norm = use_norm
         self.use_res = use_res
 
         self.gcns = torch.nn.ModuleList()
-        self.norms = torch.nn.ModuleList()
 
         self.encoder = torch.nn.ModuleDict({'vals': torch.nn.Linear(in_shape, hid_dim // 2),
                                             'cons': torch.nn.Linear(in_shape, hid_dim // 2),
@@ -29,23 +26,75 @@ class ParallelHeteroGNN(torch.nn.Module):
             if layer == 0 or not share_weight:
                 self.gcns.append(
                     HeteroConv({
-                        ('cons', 'to', 'vals'): GENConv(hid_dim, hid_dim, edge_dim=1),
-                        ('vals', 'to', 'cons'): GENConv(hid_dim, hid_dim, edge_dim=1)
+                        ('cons', 'to', 'vals'): GENConv(in_channels=hid_dim,
+                                                        out_channels=hid_dim,
+                                                        aggr='softmax',
+                                                        msg_norm=use_norm,
+                                                        learn_msg_scale=use_norm,
+                                                        norm='batch' if use_norm else None,
+                                                        bias=True,
+                                                        edge_dim=1),
+                        ('vals', 'to', 'cons'): GENConv(in_channels=hid_dim,
+                                                        out_channels=hid_dim,
+                                                        aggr='softmax',
+                                                        msg_norm=use_norm,
+                                                        learn_msg_scale=use_norm,
+                                                        norm='batch' if use_norm else None,
+                                                        bias=True,
+                                                        edge_dim=1)
                     },
                         aggr='mean') if bipartite else
                     HeteroConv({
-                        ('cons', 'to', 'vals'): GENConv(hid_dim, hid_dim, edge_dim=1),
-                        ('vals', 'to', 'cons'): GENConv(hid_dim, hid_dim, edge_dim=1),
-                        ('vals', 'to', 'obj'): GENConv(hid_dim, hid_dim, edge_dim=1, norm='layer'),
-                        ('obj', 'to', 'vals'): GENConv(hid_dim, hid_dim, edge_dim=1),
-                        ('cons', 'to', 'obj'): GENConv(hid_dim, hid_dim, edge_dim=1, norm='layer'),
-                        ('obj', 'to', 'cons'): GENConv(hid_dim, hid_dim, edge_dim=1),
+                        ('cons', 'to', 'vals'): GENConv(in_channels=hid_dim,
+                                                        out_channels=hid_dim,
+                                                        aggr='softmax',
+                                                        msg_norm=use_norm,
+                                                        learn_msg_scale=use_norm,
+                                                        norm='batch' if use_norm else None,
+                                                        bias=True,
+                                                        edge_dim=1),
+                        ('vals', 'to', 'cons'): GENConv(in_channels=hid_dim,
+                                                        out_channels=hid_dim,
+                                                        aggr='softmax',
+                                                        msg_norm=use_norm,
+                                                        learn_msg_scale=use_norm,
+                                                        norm='batch' if use_norm else None,
+                                                        bias=True,
+                                                        edge_dim=1),
+                        ('vals', 'to', 'obj'): GENConv(in_channels=hid_dim,
+                                                       out_channels=hid_dim,
+                                                       aggr='softmax',
+                                                       msg_norm=use_norm,
+                                                       learn_msg_scale=use_norm,
+                                                       norm='layer' if use_norm else None,
+                                                       bias=True,
+                                                       edge_dim=1),
+                        ('obj', 'to', 'vals'): GENConv(in_channels=hid_dim,
+                                                       out_channels=hid_dim,
+                                                       aggr='softmax',
+                                                       msg_norm=use_norm,
+                                                       learn_msg_scale=use_norm,
+                                                       norm='batch' if use_norm else None,
+                                                       bias=True,
+                                                       edge_dim=1),
+                        ('cons', 'to', 'obj'): GENConv(in_channels=hid_dim,
+                                                       out_channels=hid_dim,
+                                                       aggr='softmax',
+                                                       msg_norm=use_norm,
+                                                       learn_msg_scale=use_norm,
+                                                       norm='layer' if use_norm else None,
+                                                       bias=True,
+                                                       edge_dim=1),
+                        ('obj', 'to', 'cons'): GENConv(in_channels=hid_dim,
+                                                       out_channels=hid_dim,
+                                                       aggr='softmax',
+                                                       msg_norm=use_norm,
+                                                       learn_msg_scale=use_norm,
+                                                       norm='batch' if use_norm else None,
+                                                       bias=True,
+                                                       edge_dim=1),
                     },
                         aggr='mean'))
-                if use_norm:
-                    self.norms.append(torch.nn.ModuleDict({'obj': LayerNorm(hid_dim),
-                                                           'vals': BatchNorm1d(hid_dim),
-                                                           'cons': BatchNorm1d(hid_dim)}))
 
         self.pred_vals = torch.nn.Sequential(torch.nn.Linear(hid_dim, hid_dim),
                                              torch.nn.ReLU(),
@@ -72,8 +121,6 @@ class ParallelHeteroGNN(torch.nn.Module):
             h2 = self.gcns[i](x_dict, edge_index_dict)
             keys = h2.keys()
             hiddens.append((h2['cons'], h2['vals']))
-            if self.use_norm:
-                h2 = {k: self.norms[i][k](h2[k]) for k in keys}
             if self.use_res:
                 h = {k: (F.relu(h2[k]) + h1[k]) / 2 for k in keys}
             else:

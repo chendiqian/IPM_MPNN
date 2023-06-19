@@ -11,6 +11,7 @@ import wandb
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
 from data.dataset import SetCoverDataset
 from models.parallel_hetero_gnn import ParallelHeteroGNN
+from models.async_bipartite_gnn import UnParallelHeteroGNN
 
 
 def args_parser():
@@ -23,7 +24,10 @@ def args_parser():
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=bool, default=False)
+    parser.add_argument('--parallel', type=bool, default=True)
     parser.add_argument('--dropout', type=float, default=0.)
+    parser.add_argument('--use_norm', type=bool, default=False)
+    parser.add_argument('--patience', type=int, default=100)
     parser.add_argument('--wandbname', type=str, default='default')
     parser.add_argument('--use_wandb', type=str, default=False)
     return parser.parse_args()
@@ -92,15 +96,23 @@ if __name__ == '__main__':
     best_val_losses = []
 
     for run in range(args.runs):
-        model = ParallelHeteroGNN(bipartite=args.use_bipartite,
-                                  in_shape=2,
-                                  pe_dim=args.lappe,
-                                  hid_dim=args.hidden,
-                                  num_layers=args.ipm_steps,
-                                  dropout=args.dropout,
-                                  share_weight=False,
-                                  use_norm=False,
-                                  use_res=False).to(device)
+        if not args.parallel:
+            model = UnParallelHeteroGNN(in_shape=2,
+                                        pe_dim=args.lappe,
+                                        hid_dim=args.hidden,
+                                        num_layers=args.ipm_steps,
+                                        use_norm=args.use_norm).to(device)
+        else:
+            model = ParallelHeteroGNN(bipartite=args.use_bipartite,
+                                      in_shape=2,
+                                      pe_dim=args.lappe,
+                                      hid_dim=args.hidden,
+                                      num_layers=args.ipm_steps,
+                                      dropout=args.dropout,
+                                      share_weight=False,
+                                      use_norm=args.use_norm,
+                                      use_res=False).to(device)
+
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
 
@@ -110,11 +122,11 @@ if __name__ == '__main__':
         for epoch in pbar:
             train_loss = trainer.train(train_loader, model, optimizer)
             val_loss = trainer.eval(val_loader, model, scheduler)
-            if trainer.patience > 100:
+            if trainer.patience > args.patience:
                 break
 
-            pbar.set_postfix({'train loss': train_loss, 'val loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
-            wandb.log({'train loss': train_loss, 'val loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
+            pbar.set_postfix({'train_loss': train_loss, 'val_loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
+            wandb.log({'train_loss': train_loss, 'val_loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
         best_val_losses.append(trainer.best_val_loss)
 
     print(f'best loss: {np.mean(best_val_losses)} ± {np.std(best_val_losses)}')
