@@ -10,7 +10,7 @@ import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
 from data.dataset import SetCoverDataset
-from models import DeepHeteroGNN
+from models.parallel_hetero_gnn import ParallelHeteroGNN
 
 
 def args_parser():
@@ -92,15 +92,15 @@ if __name__ == '__main__':
     best_val_losses = []
 
     for run in range(args.runs):
-        model = DeepHeteroGNN(bipartite=args.use_bipartite,
-                              in_shape=2,
-                              pe_dim=args.lappe,
-                              hid_dim=args.hidden,
-                              num_layers=args.ipm_steps,
-                              dropout=args.dropout,
-                              share_weight=False,
-                              use_norm=False,
-                              use_res=False).to(device)
+        model = ParallelHeteroGNN(bipartite=args.use_bipartite,
+                                  in_shape=2,
+                                  pe_dim=args.lappe,
+                                  hid_dim=args.hidden,
+                                  num_layers=args.ipm_steps,
+                                  dropout=args.dropout,
+                                  share_weight=False,
+                                  use_norm=False,
+                                  use_res=False).to(device)
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
 
