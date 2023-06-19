@@ -3,7 +3,7 @@ method: bayes
 entity: ipmgnn
 project: sweep
 name: sweep
-run_cap: 3
+run_cap: 30
 
 metric:
   goal: minimize
@@ -20,7 +20,7 @@ parameters:
   lr:
     value: 1.e-3
   epoch:
-    value: 10
+    value: 1000
   batchsize:
     value: 32
 
