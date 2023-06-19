@@ -1,0 +1,55 @@
+program: run.py
+method: bayes
+entity: ipmgnn
+project: sweep
+name: sweep
+run_cap: 3
+
+metric:
+  goal: minimize
+  name: val_loss
+
+parameters:
+  runs:
+    value: 1
+  use_wandb:
+    value: True
+
+  lappe:
+    value: 5
+  lr:
+    value: 1.e-3
+  epoch:
+    value: 10
+  batchsize:
+    value: 32
+
+  ipm_steps:
+    values:
+      - 4
+      - 8
+      - 16
+    distribution: categorical
+  hidden:
+    values:
+      - 32
+      - 64
+      - 128
+      - 192
+      - 256
+      - 512
+    distribution: categorical
+  use_bipartite:
+    value: True
+  parallel:
+    values:
+      - True
+      - False
+    distribution: categorical
+  use_norm:
+    values:
+      - True
+      - False
+    distribution: categorical
+  patience:
+    value: 1000
