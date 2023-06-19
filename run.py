@@ -22,6 +22,7 @@ def args_parser():
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
+    parser.add_argument('--use_bipartite', type=bool, default=False)
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--wandbname', type=str, default='default')
     parser.add_argument('--use_wandb', type=str, default=False)
@@ -91,7 +92,8 @@ if __name__ == '__main__':
     best_val_losses = []
 
     for run in range(args.runs):
-        model = DeepHeteroGNN(in_shape=2,
+        model = DeepHeteroGNN(bipartite=args.use_bipartite,
+                              in_shape=2,
                               pe_dim=args.lappe,
                               hid_dim=args.hidden,
                               num_layers=args.ipm_steps,
