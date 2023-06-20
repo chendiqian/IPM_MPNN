@@ -42,11 +42,12 @@ class SetCoverDataset(InMemoryDataset):
         data_list = []
         for i in range(num_instance):
             # load instance
+            print(f"processing {i}th instance")
             with gzip.open(os.path.join(self.raw_dir, f"instance_{i}.pkl.gz"), "rb") as file:
                 (A, b, c) = pickle.load(file)
 
             # solve the LP
-            sol = ipm_overleaf(c.numpy(), None, None, A.numpy(), b.numpy(), None, max_iter=1000)
+            sol = ipm_overleaf(c.numpy(), None, None, A.numpy(), b.numpy(), None, max_iter=1000, lin_solver='scipy_cg')
 
             # organize results
             x, l, s = zip(*sol['xs'])
