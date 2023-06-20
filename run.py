@@ -88,8 +88,8 @@ if __name__ == '__main__':
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(32)]))
 
-    train_loader = DataLoader(dataset[:800], batch_size=args.batchsize, shuffle=True)
-    val_loader = DataLoader(dataset[800:900], batch_size=args.batchsize, shuffle=False)
+    train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)], batch_size=args.batchsize, shuffle=True)
+    val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)], batch_size=args.batchsize, shuffle=False)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
