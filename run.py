@@ -1,5 +1,6 @@
 import argparse
 
+from torch_scatter import scatter
 import numpy as np
 import torch
 from torch import optim
@@ -16,6 +17,7 @@ from models.async_bipartite_gnn import UnParallelHeteroGNN
 
 def args_parser():
     parser = argparse.ArgumentParser(description='hyper params for training graph dataset')
+    parser.add_argument('--datapath', type=str, required=True)
     parser.add_argument('--lappe', type=int, default=5)
     parser.add_argument('--ipm_steps', type=int, default=8)
     parser.add_argument('--runs', type=int, default=3)
@@ -76,6 +78,26 @@ class Trainer:
             self.patience += 1
         return val_loss
 
+    @torch.no_grad()
+    def obj_metric(self, dataloader, model):
+        model.eval()
+
+        obj_gap = []
+        for i, data in enumerate(dataloader):
+            data = data.to(self.device)
+            vals, cons = model(data)
+            pred = vals[:, -1, 0]
+            c_times_x = data.obj_const * pred
+            c_segment = (data._slice_dict['obj_const'][1:] - data._slice_dict['obj_const'][:-1]).to(self.device)
+            obj_pred = scatter(c_times_x,
+                               torch.repeat_interleave(torch.arange(data.num_graphs, device=self.device),
+                                                       c_segment),
+                               dim=0, reduce='sum')
+            obj_gt = data.obj_value
+            obj_gap.append(np.abs(((obj_gt - obj_pred) / obj_gt).cpu().numpy()))
+
+        return np.concatenate(obj_gap, axis=0)
+
 
 if __name__ == '__main__':
     args = args_parser()
@@ -83,7 +105,7 @@ if __name__ == '__main__':
                config=vars(args),
                entity="ipmgnn")
 
-    dataset = SetCoverDataset('instances/setcover',
+    dataset = SetCoverDataset(args.datapath,
                               transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(32)]))
@@ -122,11 +144,19 @@ if __name__ == '__main__':
         for epoch in pbar:
             train_loss = trainer.train(train_loader, model, optimizer)
             val_loss = trainer.eval(val_loader, model, scheduler)
+
+            train_gaps = trainer.obj_metric(train_loader, model)
+            val_gaps = trainer.obj_metric(val_loader, model)
+
             if trainer.patience > args.patience:
                 break
 
             pbar.set_postfix({'train_loss': train_loss, 'val_loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
-            wandb.log({'train_loss': train_loss, 'val_loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
+            wandb.log({'train_loss': train_loss,
+                       'val_loss': val_loss,
+                       'lr': scheduler.optimizer.param_groups[0]["lr"],
+                       "train_obj_gap": wandb.Histogram(train_gaps),
+                       "val_obj_gap": wandb.Histogram(val_gaps)})
         best_val_losses.append(trainer.best_val_loss)
 
     print(f'best loss: {np.mean(best_val_losses)} ± {np.std(best_val_losses)}')

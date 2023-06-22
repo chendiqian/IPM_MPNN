@@ -89,7 +89,9 @@ class SetCoverDataset(InMemoryDataset):
                                               :, None]},
                 gt_primals=gt_primals,
                 gt_duals=gt_duals,
-                gt_slacks=gt_slacks)
+                gt_slacks=gt_slacks,
+                obj_value=sol['fun'],
+                obj_const=c)
 
 
             if self.pre_filter is not None and not self.pre_filter(data):
