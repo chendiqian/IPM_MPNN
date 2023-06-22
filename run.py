@@ -134,6 +134,8 @@ if __name__ == '__main__':
                                       share_weight=False,
                                       use_norm=args.use_norm,
                                       use_res=False).to(device)
+        
+        wandb.watch(model, log="all", log_freq=10)
 
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
