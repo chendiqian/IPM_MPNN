@@ -14,8 +14,13 @@ class UnParallelHeteroGNN(torch.nn.Module):
         self.encoder = torch.nn.ModuleDict({'vals': torch.nn.Linear(in_shape, hid_dim // 2),
                                             'cons': torch.nn.Linear(in_shape, hid_dim // 2)})
 
-        self.pe_encoder = torch.nn.ModuleDict({'vals': torch.nn.Linear(pe_dim, hid_dim // 2),
-                                               'cons': torch.nn.Linear(pe_dim, hid_dim // 2)})
+        self.pe_encoder = torch.nn.ModuleDict({
+            'vals': torch.nn.Sequential(torch.nn.Linear(pe_dim, hid_dim),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(hid_dim, hid_dim // 2)),
+            'cons': torch.nn.Sequential(torch.nn.Linear(pe_dim, hid_dim),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(hid_dim, hid_dim // 2))})
 
         for layer in range(num_layers):
             self.vals2cons.append(GENConv(in_channels=hid_dim,

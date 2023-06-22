@@ -145,18 +145,24 @@ if __name__ == '__main__':
             train_loss = trainer.train(train_loader, model, optimizer)
             val_loss = trainer.eval(val_loader, model, scheduler)
 
-            train_gaps = trainer.obj_metric(train_loader, model)
-            val_gaps = trainer.obj_metric(val_loader, model)
+            if epoch % 10 == 1:
+                train_gaps = trainer.obj_metric(train_loader, model)
+                val_gaps = trainer.obj_metric(val_loader, model)
+            else:
+                train_gaps, val_gaps = None, None
 
             if trainer.patience > args.patience:
                 break
 
             pbar.set_postfix({'train_loss': train_loss, 'val_loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
-            wandb.log({'train_loss': train_loss,
+            log_dict = {'train_loss': train_loss,
                        'val_loss': val_loss,
-                       'lr': scheduler.optimizer.param_groups[0]["lr"],
-                       "train_obj_gap": wandb.Histogram(train_gaps),
-                       "val_obj_gap": wandb.Histogram(val_gaps)})
+                       'lr': scheduler.optimizer.param_groups[0]["lr"]}
+            if train_gaps is not None:
+                log_dict['train_obj_gap'] = wandb.Histogram(train_gaps)
+            if val_gaps is not None:
+                log_dict['val_obj_gap'] = wandb.Histogram(val_gaps)
+            wandb.log(log_dict)
         best_val_losses.append(trainer.best_val_loss)
 
     print(f'best loss: {np.mean(best_val_losses)} ± {np.std(best_val_losses)}')

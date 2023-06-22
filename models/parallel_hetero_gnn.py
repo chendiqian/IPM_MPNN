@@ -18,9 +18,16 @@ class ParallelHeteroGNN(torch.nn.Module):
                                             'cons': torch.nn.Linear(in_shape, hid_dim // 2),
                                             'obj': torch.nn.Linear(in_shape, hid_dim // 2)})
 
-        self.pe_encoder = torch.nn.ModuleDict({'vals': torch.nn.Linear(pe_dim, hid_dim // 2),
-                                            'cons': torch.nn.Linear(pe_dim, hid_dim // 2),
-                                            'obj': torch.nn.Linear(pe_dim, hid_dim // 2)})
+        self.pe_encoder = torch.nn.ModuleDict({
+            'vals': torch.nn.Sequential(torch.nn.Linear(pe_dim, hid_dim),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(hid_dim, hid_dim // 2)),
+            'cons': torch.nn.Sequential(torch.nn.Linear(pe_dim, hid_dim),
+                                        torch.nn.ReLU(),
+                                        torch.nn.Linear(hid_dim, hid_dim // 2)),
+            'obj': torch.nn.Sequential(torch.nn.Linear(pe_dim, hid_dim),
+                                       torch.nn.ReLU(),
+                                       torch.nn.Linear(hid_dim, hid_dim // 2))})
 
         for layer in range(num_layers):
             if layer == 0 or not share_weight:
