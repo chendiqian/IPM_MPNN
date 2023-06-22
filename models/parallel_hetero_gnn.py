@@ -113,11 +113,9 @@ class ParallelHeteroGNN(torch.nn.Module):
     def forward(self, data):
         x_dict, edge_index_dict = data.x_dict, data.edge_index_dict
         for k in ['cons', 'vals', 'obj']:
-            x_dict[k] = torch.relu(
-                torch.cat([self.encoder[k](x_dict[k]),
-                           0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
-                                  self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))], dim=1)
-            )
+            x_dict[k] = torch.cat([self.encoder[k](x_dict[k]),
+                                   0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
+                                          self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))], dim=1)
 
         hiddens = []
         for i in range(self.num_layers):
