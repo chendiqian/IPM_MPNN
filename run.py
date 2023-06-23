@@ -106,9 +106,9 @@ if __name__ == '__main__':
                entity="ipmgnn")
 
     dataset = SetCoverDataset(args.datapath,
-                              transform=SubSample(args.ipm_steps),
+                              # transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
-                                                     SubSample(32)]))
+                                                     SubSample(8)]))
 
     train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)], batch_size=args.batchsize, shuffle=True)
     val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)], batch_size=args.batchsize, shuffle=False)
