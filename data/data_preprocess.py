@@ -41,7 +41,7 @@ class SubSample:
             data.gt_slacks = torch.cat([data.gt_slacks,
                                         data.gt_slacks[:, -1:].repeat(1, self.k - len_seq)], dim=1)
         else:
-            data.gt_primals = data.gt_primals[:, np.linspace(0, len_seq - 1, self.k).astype(np.int64)]
-            data.gt_duals = data.gt_duals[:, np.linspace(0, len_seq - 1, self.k).astype(np.int64)]
-            data.gt_slacks = data.gt_slacks[:, np.linspace(0, len_seq - 1, self.k).astype(np.int64)]
+            data.gt_primals = data.gt_primals[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
+            data.gt_duals = data.gt_duals[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
+            data.gt_slacks = data.gt_slacks[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
         return data
