@@ -36,12 +36,16 @@ class SubSample:
         if self.k > len_seq:
             data.gt_primals = torch.cat([data.gt_primals,
                                          data.gt_primals[:, -1:].repeat(1, self.k - len_seq)], dim=1)
-            data.gt_duals = torch.cat([data.gt_duals,
-                                       data.gt_duals[:, -1:].repeat(1, self.k - len_seq)], dim=1)
-            data.gt_slacks = torch.cat([data.gt_slacks,
-                                        data.gt_slacks[:, -1:].repeat(1, self.k - len_seq)], dim=1)
+            if hasattr(data, 'gt_duals'):
+                data.gt_duals = torch.cat([data.gt_duals,
+                                           data.gt_duals[:, -1:].repeat(1, self.k - len_seq)], dim=1)
+            if hasattr(data, 'gt_slacks'):
+                data.gt_slacks = torch.cat([data.gt_slacks,
+                                            data.gt_slacks[:, -1:].repeat(1, self.k - len_seq)], dim=1)
         else:
             data.gt_primals = data.gt_primals[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
-            data.gt_duals = data.gt_duals[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
-            data.gt_slacks = data.gt_slacks[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
+            if hasattr(data, 'gt_duals'):
+                data.gt_duals = data.gt_duals[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
+            if hasattr(data, 'gt_slacks'):
+                data.gt_slacks = data.gt_slacks[:, np.linspace(1, len_seq - 1, self.k).astype(np.int64)]
         return data
