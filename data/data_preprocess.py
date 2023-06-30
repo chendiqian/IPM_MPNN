@@ -2,6 +2,17 @@ import numpy as np
 import torch
 from torch_geometric.data.hetero_data import to_homogeneous_edge_index
 from torch_geometric.transforms import AddLaplacianEigenvectorPE
+from data.utils import log_normalize
+
+
+class LogNormalize:
+    def __init__(self):
+        pass
+
+    def __call__(self, data):
+        assert data.gt_primals.min() > 0.
+        data.gt_primals = log_normalize(data.gt_primals)
+        return data
 
 
 class HeteroAddLaplacianEigenvectorPE:

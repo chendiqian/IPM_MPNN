@@ -45,6 +45,7 @@ class SetCoverDataset(InMemoryDataset):
             print(f"processing {i}th instance")
             with gzip.open(os.path.join(self.raw_dir, f"instance_{i}.pkl.gz"), "rb") as file:
                 (A, b, c) = pickle.load(file)
+                c = c / c.max()  # does not change the result
 
             # solve the LP
             # sol = ipm_overleaf(c.numpy(), None, None, A.numpy(), b.numpy(), None, max_iter=1000, lin_solver='scipy_cg')
@@ -53,7 +54,7 @@ class SetCoverDataset(InMemoryDataset):
                           A_ub=None,
                           b_ub=None,
                           A_eq=A.numpy(), b_eq=b.numpy(), bounds=None,
-                          method='interior-point', callback=lambda res: {'x': res.x, 'con': res.con})
+                          method='interior-point', callback=lambda res: res.x)
 
             # organize results
             # x, l, s = zip(*sol['xs'])
@@ -61,11 +62,12 @@ class SetCoverDataset(InMemoryDataset):
             # l = np.stack(l, axis=1)  # dual
             # s = np.stack(s, axis=1)  # slack
 
-            x = np.stack([i['x'] for i in sol.intermediate], axis=1)
-            l = np.stack([i['con'] for i in sol.intermediate], axis=1)
+            # x = np.stack([i['x'] for i in sol.intermediate], axis=1)
+            x = np.stack(sol.intermediate, axis=1)
+            # l = np.stack([i['con'] for i in sol.intermediate], axis=1)
 
             gt_primals = torch.from_numpy(x).to(torch.float)
-            gt_duals = torch.from_numpy(l).to(torch.float)
+            # gt_duals = torch.from_numpy(l).to(torch.float)
             # gt_slacks = torch.from_numpy(s).to(torch.float)
 
             data = HeteroData(
@@ -80,31 +82,26 @@ class SetCoverDataset(InMemoryDataset):
                                 'edge_weight': A[torch.where(A)][:, None]},
                 vals__to__cons={'edge_index': torch.vstack(torch.where(A.T)),
                                 'edge_weight': A.T[torch.where(A.T)][:, None]},
-                vals__to__obj={'edge_index': torch.vstack(
-                    [torch.arange(A.shape[1]), torch.zeros(A.shape[1], dtype=torch.long)]),
-                               'edge_weight': torch.nn.functional.normalize(c, p=2.0, dim=0)[
-                                              :, None]},
-                obj__to__vals={'edge_index': torch.vstack(
-                    [torch.zeros(A.shape[1], dtype=torch.long), torch.arange(A.shape[1])]),
-                               'edge_weight': torch.nn.functional.normalize(c, p=2.0, dim=0)[
-                                              :, None]},
-                cons__to__obj={'edge_index': torch.vstack(
-                    [torch.arange(A.shape[0]), torch.zeros(A.shape[0], dtype=torch.long)]),
-                               'edge_weight': torch.nn.functional.normalize(b, p=2.0, dim=0)[
-                                              :, None]},
-                obj__to__cons={'edge_index': torch.vstack(
-                    [torch.zeros(A.shape[0], dtype=torch.long), torch.arange(A.shape[0])]),
-                               'edge_weight': torch.nn.functional.normalize(b, p=2.0, dim=0)[
-                                              :, None]},
+                vals__to__obj={'edge_index': torch.vstack([torch.arange(A.shape[1]),
+                                                           torch.zeros(A.shape[1], dtype=torch.long)]),
+                               'edge_weight': c[:, None]},
+                obj__to__vals={'edge_index': torch.vstack([torch.zeros(A.shape[1], dtype=torch.long),
+                                                           torch.arange(A.shape[1])]),
+                               'edge_weight': c[:, None]},
+                cons__to__obj={'edge_index': torch.vstack([torch.arange(A.shape[0]),
+                                                           torch.zeros(A.shape[0], dtype=torch.long)]),
+                               'edge_weight': c[:, None]},
+                obj__to__cons={'edge_index': torch.vstack([torch.zeros(A.shape[0], dtype=torch.long),
+                                                           torch.arange(A.shape[0])]),
+                               'edge_weight': c[:, None]},
                 gt_primals=gt_primals,
-                gt_duals=gt_duals,
+                # gt_duals=gt_duals,
                 # gt_slacks=gt_slacks,
                 obj_value=sol['fun'],
                 obj_const=c)
 
-
-            if self.pre_filter is not None and not self.pre_filter(data):
-                continue
+            if self.pre_filter is not None:
+                raise NotImplementedError
 
             if self.pre_transform is not None:
                 data = self.pre_transform(data)

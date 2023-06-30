@@ -9,7 +9,7 @@ from torch_geometric.transforms import Compose
 from tqdm import tqdm
 import wandb
 
-from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
+from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample, LogNormalize
 from data.dataset import SetCoverDataset
 from models.parallel_hetero_gnn import ParallelHeteroGNN
 from models.async_bipartite_gnn import UnParallelHeteroGNN
@@ -108,7 +108,8 @@ if __name__ == '__main__':
     dataset = SetCoverDataset(args.datapath,
                               transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
-                                                     SubSample(8)]))
+                                                     SubSample(8),
+                                                     LogNormalize()]))
 
     train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)], batch_size=args.batchsize, shuffle=True)
     val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)], batch_size=args.batchsize, shuffle=False)
