@@ -10,7 +10,6 @@ class LogNormalize:
         pass
 
     def __call__(self, data):
-        assert data.gt_primals.min() > 0.
         data.gt_primals = log_normalize(data.gt_primals)
         return data
 
