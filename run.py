@@ -106,7 +106,7 @@ if __name__ == '__main__':
                entity="ipmgnn")
 
     dataset = SetCoverDataset(args.datapath,
-                              # transform=SubSample(args.ipm_steps),
+                              transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(8)]))
 
