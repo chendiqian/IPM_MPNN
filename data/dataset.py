@@ -97,7 +97,7 @@ class SetCoverDataset(InMemoryDataset):
                 gt_primals=gt_primals,
                 # gt_duals=gt_duals,
                 # gt_slacks=gt_slacks,
-                obj_value=sol['fun'],
+                obj_value=torch.tensor(sol['fun'].astype(np.float32)),
                 obj_const=c)
 
             if self.pre_filter is not None:

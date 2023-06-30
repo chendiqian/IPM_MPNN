@@ -42,7 +42,7 @@ class UnParallelHeteroGNN(torch.nn.Module):
 
         self.pred_vals = torch.nn.Sequential(torch.nn.Linear(hid_dim, hid_dim),
                                              torch.nn.ReLU(),
-                                             torch.nn.Linear(hid_dim, 2))
+                                             torch.nn.Linear(hid_dim, 1))
         self.pred_cons = torch.nn.Sequential(torch.nn.Linear(hid_dim, hid_dim),
                                              torch.nn.ReLU(),
                                              torch.nn.Linear(hid_dim, 1))
@@ -73,4 +73,4 @@ class UnParallelHeteroGNN(torch.nn.Module):
         vals = self.pred_vals(torch.stack(vals, dim=0))  # seq * #val * hidden
         cons = self.pred_cons(torch.stack(cons, dim=0))
 
-        return torch.transpose(vals, 0, 1), cons.squeeze().T
+        return vals.squeeze().T, cons.squeeze().T

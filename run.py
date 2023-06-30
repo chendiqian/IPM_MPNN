@@ -11,6 +11,7 @@ import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample, LogNormalize
 from data.dataset import SetCoverDataset
+from data.utils import log_denormalize
 from models.parallel_hetero_gnn import ParallelHeteroGNN
 from models.async_bipartite_gnn import UnParallelHeteroGNN
 
@@ -51,7 +52,7 @@ class Trainer:
             data = data.to(self.device)
             optimizer.zero_grad()
             vals, cons = model(data)
-            loss = self.criterion(vals[..., 0], data.gt_primals)
+            loss = self.criterion(vals, data.gt_primals)
             loss.backward()
             optimizer.step()
             train_losses += loss * data.num_graphs
@@ -66,7 +67,7 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, cons = model(data)
-            loss = self.criterion(vals[..., 0], data.gt_primals)
+            loss = self.criterion(vals, data.gt_primals)
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
@@ -85,15 +86,14 @@ class Trainer:
         obj_gap = []
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
-            vals, cons = model(data)
-            pred = vals[:, -1, 0]
-            c_times_x = data.obj_const * pred
-            c_segment = (data._slice_dict['obj_const'][1:] - data._slice_dict['obj_const'][:-1]).to(self.device)
-            obj_pred = scatter(c_times_x,
-                               torch.repeat_interleave(torch.arange(data.num_graphs, device=self.device),
-                                                       c_segment),
-                               dim=0, reduce='sum')
-            obj_gt = data.obj_value
+            vals, _ = model(data)
+            vals = log_denormalize(vals)
+            c_times_x = data.obj_const[:, None] * vals
+            obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
+            x_gt = log_denormalize(data.gt_primals)
+            c_times_xgt = data.obj_const[:, None] * x_gt
+            obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
+            assert torch.allclose(obj_gt[:, -1], data.obj_value, rtol=1.e-3, atol=1.e-5)
             obj_gap.append(np.abs(((obj_gt - obj_pred) / obj_gt).cpu().numpy()))
 
         return np.concatenate(obj_gap, axis=0)
@@ -162,9 +162,11 @@ if __name__ == '__main__':
                        'val_loss': val_loss,
                        'lr': scheduler.optimizer.param_groups[0]["lr"]}
             if train_gaps is not None:
-                log_dict['train_obj_gap'] = wandb.Histogram(train_gaps)
+                for gnn_l in range(train_gaps.shape[1]):
+                    log_dict[f'train_obj_gap_layer{gnn_l}'] = wandb.Histogram(train_gaps[:, gnn_l])
             if val_gaps is not None:
-                log_dict['val_obj_gap'] = wandb.Histogram(val_gaps)
+                for gnn_l in range(val_gaps.shape[1]):
+                    log_dict[f'val_obj_gap_layer{gnn_l}'] = wandb.Histogram(val_gaps[:, gnn_l])
             wandb.log(log_dict)
         best_val_losses.append(trainer.best_val_loss)
 
