@@ -53,7 +53,7 @@ class SetCoverDataset(InMemoryDataset):
                           A_ub=None,
                           b_ub=None,
                           A_eq=A.numpy(), b_eq=b.numpy(), bounds=None,
-                          method='interior-point', callback=lambda res: res.x)
+                          method='interior-point', callback=lambda res: {'x': res.x, 'con': res.con})
 
             # organize results
             # x, l, s = zip(*sol['xs'])
@@ -61,10 +61,11 @@ class SetCoverDataset(InMemoryDataset):
             # l = np.stack(l, axis=1)  # dual
             # s = np.stack(s, axis=1)  # slack
 
-            x = np.stack(sol.intermediate, axis=1)
+            x = np.stack([i['x'] for i in sol.intermediate], axis=1)
+            l = np.stack([i['con'] for i in sol.intermediate], axis=1)
 
             gt_primals = torch.from_numpy(x).to(torch.float)
-            # gt_duals = torch.from_numpy(l).to(torch.float)
+            gt_duals = torch.from_numpy(l).to(torch.float)
             # gt_slacks = torch.from_numpy(s).to(torch.float)
 
             data = HeteroData(
@@ -96,7 +97,7 @@ class SetCoverDataset(InMemoryDataset):
                                'edge_weight': torch.nn.functional.normalize(b, p=2.0, dim=0)[
                                               :, None]},
                 gt_primals=gt_primals,
-                # gt_duals=gt_duals,
+                gt_duals=gt_duals,
                 # gt_slacks=gt_slacks,
                 obj_value=sol['fun'],
                 obj_const=c)
