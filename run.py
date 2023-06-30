@@ -11,7 +11,7 @@ import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample, LogNormalize
 from data.dataset import SetCoverDataset
-from data.utils import log_denormalize
+from data.utils import log_denormalize, mode_of_distribution
 from models.parallel_hetero_gnn import ParallelHeteroGNN
 from models.async_bipartite_gnn import UnParallelHeteroGNN
 
@@ -163,10 +163,12 @@ if __name__ == '__main__':
                        'lr': scheduler.optimizer.param_groups[0]["lr"]}
             if train_gaps is not None:
                 for gnn_l in range(train_gaps.shape[1]):
-                    log_dict[f'train_obj_gap_layer{gnn_l}'] = wandb.Histogram(train_gaps[:, gnn_l])
+                    log_dict[f'train_obj_gap_l{gnn_l}_mean'] = train_gaps[:, gnn_l].mean()
+                    log_dict[f'train_obj_gap_l{gnn_l}_mode'] = mode_of_distribution(train_gaps[:, gnn_l])
             if val_gaps is not None:
                 for gnn_l in range(val_gaps.shape[1]):
-                    log_dict[f'val_obj_gap_layer{gnn_l}'] = wandb.Histogram(val_gaps[:, gnn_l])
+                    log_dict[f'val_obj_gap_l{gnn_l}_mean'] = val_gaps[:, gnn_l].mean()
+                    log_dict[f'val_obj_gap_l{gnn_l}_mode'] = mode_of_distribution(val_gaps[:, gnn_l])
             wandb.log(log_dict)
         best_val_losses.append(trainer.best_val_loss)
 
