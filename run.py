@@ -27,6 +27,7 @@ def args_parser():
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=bool, default=False)
+    parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'objgap'])
     parser.add_argument('--parallel', type=bool, default=True)
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--use_norm', type=bool, default=False)
@@ -37,11 +38,12 @@ def args_parser():
 
 
 class Trainer:
-    def __init__(self, device, criterion):
+    def __init__(self, device, criterion, loss_type):
         self.best_val_loss = 1.e8
         self.patience = 0
         self.device = device
         self.criterion = criterion
+        self.loss_type = loss_type
 
     def train(self, dataloader, model, optimizer):
         model.train()
@@ -52,7 +54,12 @@ class Trainer:
             data = data.to(self.device)
             optimizer.zero_grad()
             vals, cons = model(data)
-            loss = self.criterion(vals, data.gt_primals)
+            if self.loss_type == 'primal':
+                loss = self.criterion(vals, data.gt_primals)
+            elif self.loss_type == 'objgap':
+                loss = self.get_obj_metric(data, vals).mean()
+            else:
+                raise NotImplementedError
             loss.backward()
             optimizer.step()
             train_losses += loss * data.num_graphs
@@ -67,7 +74,12 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, cons = model(data)
-            loss = self.criterion(vals, data.gt_primals)
+            if self.loss_type == 'primal':
+                loss = self.criterion(vals, data.gt_primals)
+            elif self.loss_type == 'objgap':
+                loss = self.get_obj_metric(data, vals).mean()
+            else:
+                raise NotImplementedError
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
@@ -79,7 +91,15 @@ class Trainer:
             self.patience += 1
         return val_loss
 
-    @torch.no_grad()
+    def get_obj_metric(self, data, pred):
+        pred = log_denormalize(pred)
+        c_times_x = data.obj_const[:, None] * pred
+        obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
+        x_gt = log_denormalize(data.gt_primals)
+        c_times_xgt = data.obj_const[:, None] * x_gt
+        obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
+        return torch.abs(obj_pred - obj_gt) / obj_gt
+
     def obj_metric(self, dataloader, model):
         model.eval()
 
@@ -87,14 +107,7 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
-            vals = log_denormalize(vals)
-            c_times_x = data.obj_const[:, None] * vals
-            obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
-            x_gt = log_denormalize(data.gt_primals)
-            c_times_xgt = data.obj_const[:, None] * x_gt
-            obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
-            assert torch.allclose(obj_gt[:, -1], data.obj_value, rtol=1.e-3, atol=1.e-5)
-            obj_gap.append(np.abs(((obj_gt - obj_pred) / obj_gt).cpu().numpy()))
+            obj_gap.append(self.get_obj_metric(data, vals).cpu().numpy())
 
         return np.concatenate(obj_gap, axis=0)
 
@@ -141,7 +154,7 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
 
-        trainer = Trainer(device, torch.nn.MSELoss())
+        trainer = Trainer(device, torch.nn.MSELoss(), args.loss)
 
         pbar = tqdm(range(args.epoch))
         for epoch in pbar:
@@ -149,8 +162,9 @@ if __name__ == '__main__':
             val_loss = trainer.eval(val_loader, model, scheduler)
 
             if epoch % 10 == 1:
-                train_gaps = trainer.obj_metric(train_loader, model)
-                val_gaps = trainer.obj_metric(val_loader, model)
+                with torch.no_grad():
+                    train_gaps = trainer.obj_metric(train_loader, model)
+                    val_gaps = trainer.obj_metric(val_loader, model)
             else:
                 train_gaps, val_gaps = None, None
 
