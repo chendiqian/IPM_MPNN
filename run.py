@@ -27,7 +27,7 @@ def args_parser():
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=bool, default=False)
-    parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'objgap'])
+    parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'objgap', 'primal+objgap'])
     parser.add_argument('--parallel', type=bool, default=True)
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--use_norm', type=bool, default=False)
@@ -43,7 +43,7 @@ class Trainer:
         self.patience = 0
         self.device = device
         self.criterion = criterion
-        self.loss_type = loss_type
+        self.loss_type = loss_type.split('+')
 
     def train(self, dataloader, model, optimizer):
         model.train()
@@ -54,12 +54,11 @@ class Trainer:
             data = data.to(self.device)
             optimizer.zero_grad()
             vals, cons = model(data)
-            if self.loss_type == 'primal':
-                loss = self.criterion(vals, data.gt_primals)
-            elif self.loss_type == 'objgap':
-                loss = self.get_obj_metric(data, vals).mean()
-            else:
-                raise NotImplementedError
+            loss = 0.
+            if 'primal' in self.loss_type:
+                loss = loss + self.criterion(vals, data.gt_primals)
+            elif 'objgap' in self.loss_type:
+                loss = loss + self.get_obj_metric(data, vals).mean()
             loss.backward()
             optimizer.step()
             train_losses += loss * data.num_graphs
@@ -74,12 +73,11 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, cons = model(data)
-            if self.loss_type == 'primal':
-                loss = self.criterion(vals, data.gt_primals)
-            elif self.loss_type == 'objgap':
-                loss = self.get_obj_metric(data, vals).mean()
-            else:
-                raise NotImplementedError
+            loss = 0.
+            if 'primal' in self.loss_type:
+                loss = loss + self.criterion(vals, data.gt_primals)
+            elif 'objgap' in self.loss_type:
+                loss = loss + self.get_obj_metric(data, vals).mean()
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
