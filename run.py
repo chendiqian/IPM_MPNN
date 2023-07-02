@@ -29,7 +29,7 @@ def args_parser():
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=bool, default=False)
     parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'objgap', 'primal+objgap'])
-    parser.add_argument('--parallel', type=bool, default=False)
+    parser.add_argument('--parallel', type=bool, default=True)
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--use_norm', type=bool, default=True)
     parser.add_argument('--patience', type=int, default=100)
