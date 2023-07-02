@@ -1,5 +1,6 @@
 import argparse
 from functools import partial
+from ml_collections import ConfigDict
 
 from torch_scatter import scatter
 import numpy as np
@@ -12,7 +13,7 @@ import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample, LogNormalize
 from data.dataset import SetCoverDataset
-from data.utils import log_denormalize
+from data.utils import log_denormalize, args_set_bool
 from models.parallel_hetero_gnn import ParallelHeteroGNN
 from models.async_bipartite_gnn import UnParallelHeteroGNN
 
@@ -28,16 +29,16 @@ def args_parser():
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
-    parser.add_argument('--use_bipartite', type=bool, default=False)
+    parser.add_argument('--use_bipartite', type=str, default='false')
     parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'objgap', 'primal+objgap'])
     parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])
-    parser.add_argument('--parallel', type=bool, default=True)
+    parser.add_argument('--parallel', type=str, default='true')
     parser.add_argument('--dropout', type=float, default=0.)
-    parser.add_argument('--use_norm', type=bool, default=True)
+    parser.add_argument('--use_norm', type=str, default='true')
     parser.add_argument('--patience', type=int, default=100)
     parser.add_argument('--wandbname', type=str, default='default')
-    parser.add_argument('--use_wandb', type=str, default=False)
-    parser.add_argument('--normalize_dataset', type=bool, default=False)
+    parser.add_argument('--use_wandb', type=str, default='false')
+    parser.add_argument('--normalize_dataset', type=str, default='false')
     return parser.parse_args()
 
 
@@ -133,6 +134,9 @@ class Trainer:
 
 if __name__ == '__main__':
     args = args_parser()
+    args = args_set_bool(vars(args))
+    args = ConfigDict(args)
+
     wandb.init(project=args.wandbname, mode="online" if args.use_wandb else "disabled",
                config=vars(args),
                entity="ipmgnn")
