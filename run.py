@@ -1,4 +1,5 @@
 import argparse
+from functools import partial
 
 from torch_scatter import scatter
 import numpy as np
@@ -21,6 +22,7 @@ def args_parser():
     parser.add_argument('--datapath', type=str, required=True)
     parser.add_argument('--lappe', type=int, default=5)
     parser.add_argument('--ipm_steps', type=int, default=8)
+    parser.add_argument('--ipm_alpha', type=float, default=0.9)
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--lr', type=float, default=1.e-3)
     parser.add_argument('--epoch', type=int, default=1000)
@@ -28,6 +30,7 @@ def args_parser():
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=bool, default=False)
     parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'objgap', 'primal+objgap'])
+    parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])
     parser.add_argument('--parallel', type=bool, default=True)
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--use_norm', type=bool, default=True)
@@ -39,12 +42,21 @@ def args_parser():
 
 
 class Trainer:
-    def __init__(self, device, criterion, loss_type, mean, std):
+    def __init__(self, device, loss_target, loss_type, mean, std, ipm_steps, ipm_alpha):
+        assert 0. <= ipm_alpha <= 1.
+        self.step_weight = torch.tensor([ipm_alpha ** (ipm_steps - l - 1)
+                                         for l in range(ipm_steps)],
+                                        dtype=torch.float, device=device)[None]
         self.best_val_loss = 1.e8
         self.patience = 0
         self.device = device
-        self.criterion = criterion
-        self.loss_type = loss_type.split('+')
+        self.loss_target = loss_target.split('+')
+        if loss_type == 'l2':
+            self.loss_func = partial(torch.pow, exponent=2)
+        elif loss_type == 'l1':
+            self.loss_func = torch.abs
+        else:
+            raise ValueError
         self.mean = mean
         self.std = std
 
@@ -58,10 +70,12 @@ class Trainer:
             optimizer.zero_grad()
             vals, cons = model(data)
             loss = 0.
-            if 'primal' in self.loss_type:
-                loss = loss + self.criterion(vals, data.gt_primals)
-            elif 'objgap' in self.loss_type:
-                loss = loss + self.get_obj_metric(data, vals).mean()
+            if 'primal' in self.loss_target:
+                primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight).mean()
+                loss = loss + primal_loss
+            elif 'objgap' in self.loss_target:
+                obj_loss = (self.loss_func(self.get_obj_metric(data, vals)) * self.step_weight).mean()
+                loss = loss + obj_loss
             loss.backward()
             optimizer.step()
             train_losses += loss * data.num_graphs
@@ -77,10 +91,12 @@ class Trainer:
             data = data.to(self.device)
             vals, cons = model(data)
             loss = 0.
-            if 'primal' in self.loss_type:
-                loss = loss + self.criterion(vals, data.gt_primals)
-            elif 'objgap' in self.loss_type:
-                loss = loss + self.get_obj_metric(data, vals).mean()
+            if 'primal' in self.loss_target:
+                primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight).mean()
+                loss = loss + primal_loss
+            elif 'objgap' in self.loss_target:
+                obj_loss = (self.loss_func(self.get_obj_metric(data, vals)) * self.step_weight).mean()
+                loss = loss + obj_loss
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
@@ -101,7 +117,7 @@ class Trainer:
         x_gt = log_denormalize(x_gt)
         c_times_xgt = data.obj_const[:, None] * x_gt
         obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
-        return torch.abs(obj_pred - obj_gt) / obj_gt
+        return (obj_pred - obj_gt) / obj_gt
 
     def obj_metric(self, dataloader, model):
         model.eval()
@@ -110,7 +126,7 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
-            obj_gap.append(self.get_obj_metric(data, vals).cpu().numpy())
+            obj_gap.append(np.abs(self.get_obj_metric(data, vals).cpu().numpy()))
 
         return np.concatenate(obj_gap, axis=0)
 
@@ -158,7 +174,7 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
 
-        trainer = Trainer(device, torch.nn.MSELoss(), args.loss, dataset.mean, dataset.std)
+        trainer = Trainer(device, args.loss, args.losstype, dataset.mean, dataset.std, args.ipm_steps, args.ipm_alpha)
 
         pbar = tqdm(range(args.epoch))
         for epoch in pbar:
