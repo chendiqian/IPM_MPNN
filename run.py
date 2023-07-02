@@ -1,5 +1,4 @@
 import argparse
-import pdb
 
 from torch_scatter import scatter
 import numpy as np
@@ -12,7 +11,7 @@ import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample, LogNormalize
 from data.dataset import SetCoverDataset
-from data.utils import log_denormalize, mode_of_distribution
+from data.utils import log_denormalize
 from models.parallel_hetero_gnn import ParallelHeteroGNN
 from models.async_bipartite_gnn import UnParallelHeteroGNN
 
@@ -35,16 +34,19 @@ def args_parser():
     parser.add_argument('--patience', type=int, default=100)
     parser.add_argument('--wandbname', type=str, default='default')
     parser.add_argument('--use_wandb', type=str, default=False)
+    parser.add_argument('--normalize_dataset', type=bool, default=False)
     return parser.parse_args()
 
 
 class Trainer:
-    def __init__(self, device, criterion, loss_type):
+    def __init__(self, device, criterion, loss_type, mean, std):
         self.best_val_loss = 1.e8
         self.patience = 0
         self.device = device
         self.criterion = criterion
         self.loss_type = loss_type.split('+')
+        self.mean = mean
+        self.std = std
 
     def train(self, dataloader, model, optimizer):
         model.train()
@@ -91,10 +93,12 @@ class Trainer:
         return val_loss
 
     def get_obj_metric(self, data, pred):
+        pred = pred * self.std + self.mean
         pred = log_denormalize(pred)
         c_times_x = data.obj_const[:, None] * pred
         obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
-        x_gt = log_denormalize(data.gt_primals)
+        x_gt = data.gt_primals * self.std + self.mean
+        x_gt = log_denormalize(x_gt)
         c_times_xgt = data.obj_const[:, None] * x_gt
         obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
         return torch.abs(obj_pred - obj_gt) / obj_gt
@@ -118,6 +122,7 @@ if __name__ == '__main__':
                entity="ipmgnn")
 
     dataset = SetCoverDataset(args.datapath,
+                              normalize=args.normalize_dataset,
                               transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(8),
@@ -153,7 +158,7 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=args.lr)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
 
-        trainer = Trainer(device, torch.nn.MSELoss(), args.loss)
+        trainer = Trainer(device, torch.nn.MSELoss(), args.loss, dataset.mean, dataset.std)
 
         pbar = tqdm(range(args.epoch))
         for epoch in pbar:
@@ -177,11 +182,11 @@ if __name__ == '__main__':
             if train_gaps is not None:
                 for gnn_l in range(train_gaps.shape[1]):
                     log_dict[f'train_obj_gap_l{gnn_l}_mean'] = train_gaps[:, gnn_l].mean()
-                    log_dict[f'train_obj_gap_l{gnn_l}_mode'] = mode_of_distribution(train_gaps[:, gnn_l])
+                    log_dict[f'train_obj_gap_l{gnn_l}'] = wandb.Histogram(train_gaps[:, gnn_l])
             if val_gaps is not None:
                 for gnn_l in range(val_gaps.shape[1]):
                     log_dict[f'val_obj_gap_l{gnn_l}_mean'] = val_gaps[:, gnn_l].mean()
-                    log_dict[f'val_obj_gap_l{gnn_l}_mode'] = mode_of_distribution(val_gaps[:, gnn_l])
+                    log_dict[f'val_obj_gap_l{gnn_l}'] = wandb.Histogram(val_gaps[:, gnn_l])
             wandb.log(log_dict)
         best_val_losses.append(trainer.best_val_loss)
 

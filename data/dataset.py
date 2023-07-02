@@ -16,6 +16,7 @@ class SetCoverDataset(InMemoryDataset):
     def __init__(
         self,
         root: str,
+        normalize: bool,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
@@ -23,6 +24,18 @@ class SetCoverDataset(InMemoryDataset):
         super().__init__(root, transform, pre_transform, pre_filter)
         path = osp.join(self.processed_dir, 'data.pt')
         self.data, self.slices = torch.load(path)
+
+        if normalize:
+            self.std = self.data.gt_primals.std()
+            self.mean = self.data.gt_primals.mean()
+            self.data.gt_primals = (self.data.gt_primals - self.mean) / self.std
+            for k in ['cons', 'vals']:
+                self.data[k].x = (self.data[k].x -
+                                       self.data[k].x.mean(0, keepdims=True)) / \
+                                      self.data[k].x.std(0, keepdims=True)
+        else:
+            self.std, self.mean = 1., 0.
+
 
     @property
     def raw_file_names(self) -> List[str]:
