@@ -1,4 +1,5 @@
 import argparse
+import pdb
 
 from torch_scatter import scatter
 import numpy as np
@@ -21,16 +22,16 @@ def args_parser():
     parser.add_argument('--datapath', type=str, required=True)
     parser.add_argument('--lappe', type=int, default=5)
     parser.add_argument('--ipm_steps', type=int, default=8)
-    parser.add_argument('--runs', type=int, default=3)
+    parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--lr', type=float, default=1.e-3)
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=bool, default=False)
     parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'objgap', 'primal+objgap'])
-    parser.add_argument('--parallel', type=bool, default=True)
+    parser.add_argument('--parallel', type=bool, default=False)
     parser.add_argument('--dropout', type=float, default=0.)
-    parser.add_argument('--use_norm', type=bool, default=False)
+    parser.add_argument('--use_norm', type=bool, default=True)
     parser.add_argument('--patience', type=int, default=100)
     parser.add_argument('--wandbname', type=str, default='default')
     parser.add_argument('--use_wandb', type=str, default=False)
@@ -184,4 +185,5 @@ if __name__ == '__main__':
             wandb.log(log_dict)
         best_val_losses.append(trainer.best_val_loss)
 
+    torch.save(model.state_dict(), 'best_model.pt')
     print(f'best loss: {np.mean(best_val_losses)} ± {np.std(best_val_losses)}')
