@@ -1,4 +1,5 @@
 from typing import Dict
+import math
 
 import torch
 import numpy as np
@@ -26,3 +27,8 @@ def args_set_bool(args: Dict):
             elif v.lower() == 'false':
                 args[k] = False
     return args
+
+
+def barrier_function(x, t=1.e5):
+    cond = x.detach() >= 1 / (t ** 2)
+    return torch.where(cond, (-1 / t) * torch.log(x), -t * x - 1 / t * math.log(1 / (t ** 2)) + 1 / t)
