@@ -27,13 +27,29 @@ except ImportError:
     has_umfpack = False
 
 
+def _get_rand_start(shape):
+    """
+    Instead of this https://github.com/scipy/scipy/blob/main/scipy/optimize/_linprog_ip.py#L436
+    we use random init values
+
+    """
+    m, n = shape
+    x0 = np.random.rand(n)
+    y0 = np.random.rand(m)
+    z0 = np.random.rand(n)
+    tau0 = 1
+    kappa0 = 1
+    return x0, y0, z0, tau0, kappa0
+
+
+
 def _ip_hsd(A, b, c, c0, alpha0, beta, maxiter, disp, tol, sparse, lstsq,
             sym_pos, cholesky, pc, ip, permc_spec, callback, postsolve_args):
 
     iteration = 0
 
     # default initial point
-    x, y, z, tau, kappa = _get_blind_start(A.shape)
+    x, y, z, tau, kappa = _get_rand_start(A.shape)
 
     # first iteration is special improvement of initial point
     ip = ip if pc else False

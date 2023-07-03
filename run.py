@@ -22,6 +22,7 @@ def args_parser():
     parser = argparse.ArgumentParser(description='hyper params for training graph dataset')
     parser.add_argument('--datapath', type=str, required=True)
     parser.add_argument('--lappe', type=int, default=5)
+    parser.add_argument('--ipm_restarts', type=int, default=10)
     parser.add_argument('--ipm_steps', type=int, default=8)
     parser.add_argument('--ipm_alpha', type=float, default=0.9)
     parser.add_argument('--runs', type=int, default=1)
@@ -143,6 +144,7 @@ if __name__ == '__main__':
 
     dataset = SetCoverDataset(args.datapath,
                               normalize=args.normalize_dataset,
+                              rand_starts=args.ipm_restarts,
                               transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(8),

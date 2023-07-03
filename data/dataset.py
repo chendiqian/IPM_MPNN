@@ -17,10 +17,12 @@ class SetCoverDataset(InMemoryDataset):
         self,
         root: str,
         normalize: bool,
+        rand_starts: int = 10,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
     ):
+        self.rand_starts = rand_starts
         super().__init__(root, transform, pre_transform, pre_filter)
         path = osp.join(self.processed_dir, 'data.pt')
         self.data, self.slices = torch.load(path)
@@ -63,62 +65,64 @@ class SetCoverDataset(InMemoryDataset):
             # solve the LP
             # sol = ipm_overleaf(c.numpy(), None, None, A.numpy(), b.numpy(), None, max_iter=1000, lin_solver='scipy_cg')
 
-            sol = linprog(c.numpy(),
-                          A_ub=None,
-                          b_ub=None,
-                          A_eq=A.numpy(), b_eq=b.numpy(), bounds=None,
-                          method='interior-point', callback=lambda res: res.x)
+            for _ in range(self.rand_starts):
+                sol = linprog(c.numpy(),
+                              A_ub=None,
+                              b_ub=None,
+                              A_eq=A.numpy(), b_eq=b.numpy(), bounds=None,
+                              method='interior-point', callback=lambda res: res.x)
 
-            # organize results
-            # x, l, s = zip(*sol['xs'])
-            # x = np.stack(x, axis=1)  # primal
-            # l = np.stack(l, axis=1)  # dual
-            # s = np.stack(s, axis=1)  # slack
+                # organize results
+                # x, l, s = zip(*sol['xs'])
+                # x = np.stack(x, axis=1)  # primal
+                # l = np.stack(l, axis=1)  # dual
+                # s = np.stack(s, axis=1)  # slack
 
-            # x = np.stack([i['x'] for i in sol.intermediate], axis=1)
-            x = np.stack(sol.intermediate, axis=1)
-            # l = np.stack([i['con'] for i in sol.intermediate], axis=1)
+                # x = np.stack([i['x'] for i in sol.intermediate], axis=1)
+                x = np.stack(sol.intermediate, axis=1)
 
-            gt_primals = torch.from_numpy(x).to(torch.float)
-            # gt_duals = torch.from_numpy(l).to(torch.float)
-            # gt_slacks = torch.from_numpy(s).to(torch.float)
+                # l = np.stack([i['con'] for i in sol.intermediate], axis=1)
 
-            data = HeteroData(
-                cons={'x': torch.cat([A.mean(1, keepdims=True),
-                                      A.std(1, keepdims=True)], dim=1)},
-                vals={'x': torch.cat([A.mean(0, keepdims=True),
-                                      A.std(0, keepdims=True)], dim=0).T},
-                obj={'x': torch.cat([c.mean(0, keepdims=True),
-                                     c.std(0, keepdims=True)], dim=0)[None]},
+                gt_primals = torch.from_numpy(x).to(torch.float)
+                # gt_duals = torch.from_numpy(l).to(torch.float)
+                # gt_slacks = torch.from_numpy(s).to(torch.float)
 
-                cons__to__vals={'edge_index': torch.vstack(torch.where(A)),
-                                'edge_attr': A[torch.where(A)][:, None]},
-                vals__to__cons={'edge_index': torch.vstack(torch.where(A.T)),
-                                'edge_attr': A.T[torch.where(A.T)][:, None]},
-                vals__to__obj={'edge_index': torch.vstack([torch.arange(A.shape[1]),
-                                                           torch.zeros(A.shape[1], dtype=torch.long)]),
-                               'edge_attr': c[:, None]},
-                obj__to__vals={'edge_index': torch.vstack([torch.zeros(A.shape[1], dtype=torch.long),
-                                                           torch.arange(A.shape[1])]),
-                               'edge_attr': c[:, None]},
-                cons__to__obj={'edge_index': torch.vstack([torch.arange(A.shape[0]),
-                                                           torch.zeros(A.shape[0], dtype=torch.long)]),
-                               'edge_attr': b[:, None]},
-                obj__to__cons={'edge_index': torch.vstack([torch.zeros(A.shape[0], dtype=torch.long),
-                                                           torch.arange(A.shape[0])]),
-                               'edge_attr': b[:, None]},
-                gt_primals=gt_primals,
-                # gt_duals=gt_duals,
-                # gt_slacks=gt_slacks,
-                obj_value=torch.tensor(sol['fun'].astype(np.float32)),
-                obj_const=c)
+                data = HeteroData(
+                    cons={'x': torch.cat([A.mean(1, keepdims=True),
+                                          A.std(1, keepdims=True)], dim=1)},
+                    vals={'x': torch.cat([A.mean(0, keepdims=True),
+                                          A.std(0, keepdims=True)], dim=0).T},
+                    obj={'x': torch.cat([c.mean(0, keepdims=True),
+                                         c.std(0, keepdims=True)], dim=0)[None]},
 
-            if self.pre_filter is not None:
-                raise NotImplementedError
+                    cons__to__vals={'edge_index': torch.vstack(torch.where(A)),
+                                    'edge_attr': A[torch.where(A)][:, None]},
+                    vals__to__cons={'edge_index': torch.vstack(torch.where(A.T)),
+                                    'edge_attr': A.T[torch.where(A.T)][:, None]},
+                    vals__to__obj={'edge_index': torch.vstack([torch.arange(A.shape[1]),
+                                                               torch.zeros(A.shape[1], dtype=torch.long)]),
+                                   'edge_attr': c[:, None]},
+                    obj__to__vals={'edge_index': torch.vstack([torch.zeros(A.shape[1], dtype=torch.long),
+                                                               torch.arange(A.shape[1])]),
+                                   'edge_attr': c[:, None]},
+                    cons__to__obj={'edge_index': torch.vstack([torch.arange(A.shape[0]),
+                                                               torch.zeros(A.shape[0], dtype=torch.long)]),
+                                   'edge_attr': b[:, None]},
+                    obj__to__cons={'edge_index': torch.vstack([torch.zeros(A.shape[0], dtype=torch.long),
+                                                               torch.arange(A.shape[0])]),
+                                   'edge_attr': b[:, None]},
+                    gt_primals=gt_primals,
+                    # gt_duals=gt_duals,
+                    # gt_slacks=gt_slacks,
+                    obj_value=torch.tensor(sol['fun'].astype(np.float32)),
+                    obj_const=c)
 
-            if self.pre_transform is not None:
-                data = self.pre_transform(data)
+                if self.pre_filter is not None:
+                    raise NotImplementedError
 
-            data_list.append(data)
+                if self.pre_transform is not None:
+                    data = self.pre_transform(data)
+
+                data_list.append(data)
 
         torch.save(self.collate(data_list), osp.join(self.processed_dir, 'data.pt'))
