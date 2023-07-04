@@ -45,7 +45,7 @@ class SetCoverDataset(InMemoryDataset):
 
     @property
     def processed_dir(self) -> str:
-        return osp.join(self.root, 'processed')
+        return osp.join(self.root, f'processed_{self.rand_starts}restarts')
 
     @property
     def processed_file_names(self) -> List[str]:
