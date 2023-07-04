@@ -145,13 +145,13 @@ if __name__ == '__main__':
     dataset = SetCoverDataset(args.datapath,
                               normalize=args.normalize_dataset,
                               rand_starts=args.ipm_restarts,
-                              transform=SubSample(args.ipm_steps),
+                              # transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(8),
                                                      LogNormalize()]))
 
-    train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)], batch_size=args.batchsize, shuffle=True)
-    val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)], batch_size=args.batchsize, shuffle=False)
+    train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)], batch_size=args.batchsize, shuffle=True, num_workers=4, pin_memory=True)
+    val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)], batch_size=args.batchsize, shuffle=False, num_workers=4, pin_memory=True)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
