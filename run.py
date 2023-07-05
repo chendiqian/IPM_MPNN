@@ -88,6 +88,8 @@ class Trainer:
 
     @torch.no_grad()
     def eval(self, dataloader, model, scheduler):
+        model.eval()
+
         val_losses = 0.
         num_graphs = 0
         for i, data in enumerate(dataloader):
