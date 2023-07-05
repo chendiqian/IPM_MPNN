@@ -50,6 +50,7 @@ class Trainer:
                                          for l in range(ipm_steps)],
                                         dtype=torch.float, device=device)[None]
         self.best_val_loss = 1.e8
+        self.best_val_objgap = 100.
         self.patience = 0
         self.device = device
         self.loss_target = loss_target.split('+')
@@ -156,6 +157,7 @@ if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
     best_val_losses = []
+    best_val_objgap_mean = []
 
     for run in range(args.runs):
         if not args.parallel:
@@ -191,6 +193,7 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     train_gaps = trainer.obj_metric(train_loader, model)
                     val_gaps = trainer.obj_metric(val_loader, model)
+                    trainer.best_val_objgap = min(trainer.best_val_objgap, val_gaps[:, -1].mean().item())
             else:
                 train_gaps, val_gaps = None, None
 
@@ -211,6 +214,8 @@ if __name__ == '__main__':
                     log_dict[f'val_obj_gap_l{gnn_l}'] = wandb.Histogram(val_gaps[:, gnn_l])
             wandb.log(log_dict)
         best_val_losses.append(trainer.best_val_loss)
+        best_val_objgap_mean.append(trainer.best_val_objgap)
 
     torch.save(model.state_dict(), 'best_model.pt')
-    print(f'best loss: {np.mean(best_val_losses)} ± {np.std(best_val_losses)}')
+    wandb.log({'best_val_loss': np.mean(best_val_losses),
+               'best_val_objgap': np.mean(best_val_objgap_mean)})
