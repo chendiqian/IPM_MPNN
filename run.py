@@ -6,14 +6,14 @@ from torch_scatter import scatter
 import numpy as np
 import torch
 from torch import optim
-from torch_geometric.loader import DataLoader
+from torch.utils.data import DataLoader
 from torch_geometric.transforms import Compose
 from tqdm import tqdm
 import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample, LogNormalize
-from data.dataset import SetCoverDataset
-from data.utils import log_denormalize, args_set_bool
+from data.dataset import SetCoverDataset, collate_fn_ip
+from data.utils import log_denormalize, args_set_bool, barrier_function
 from models.parallel_hetero_gnn import ParallelHeteroGNN
 from models.async_bipartite_gnn import UnParallelHeteroGNN
 
@@ -31,7 +31,7 @@ def args_parser():
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=str, default='false')
-    parser.add_argument('--loss', type=str, default='primal', choices=['primal', 'primal+objgap'])
+    parser.add_argument('--loss', type=str, default='primal', choices=['unsupervised', 'primal', 'primal+objgap'])
     parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])
     parser.add_argument('--parallel', type=str, default='true')
     parser.add_argument('--dropout', type=float, default=0.)
@@ -53,7 +53,10 @@ class Trainer:
         self.best_val_objgap = 100.
         self.patience = 0
         self.device = device
-        self.loss_target = loss_target.split('+')
+        if loss_target != 'unsupervised':
+            self.loss_target = loss_target.split('+')
+        else:
+            self.loss_target = loss_target
         if loss_type == 'l2':
             self.loss_func = partial(torch.pow, exponent=2)
         elif loss_type == 'l1':
@@ -72,14 +75,11 @@ class Trainer:
             data = data.to(self.device)
             optimizer.zero_grad()
             vals, cons = model(data)
-            loss = 0.
-            if 'primal' in self.loss_target:
-                primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight).mean()
-                loss = loss + primal_loss
-            elif 'objgap' in self.loss_target:
-                obj_loss = (self.loss_func(self.get_obj_metric(data, vals)) * self.step_weight).mean()
-                loss = loss + obj_loss
+            loss = self.get_loss(vals, data)
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                           max_norm=1.0,
+                                           error_if_nonfinite=True)
             optimizer.step()
             train_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
@@ -95,13 +95,7 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, cons = model(data)
-            loss = 0.
-            if 'primal' in self.loss_target:
-                primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight).mean()
-                loss = loss + primal_loss
-            elif 'objgap' in self.loss_target:
-                obj_loss = (self.loss_func(self.get_obj_metric(data, vals)) * self.step_weight).mean()
-                loss = loss + obj_loss
+            loss = self.get_loss(vals, data)
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
@@ -112,6 +106,29 @@ class Trainer:
         else:
             self.patience += 1
         return val_loss
+
+    def get_loss(self, vals, data):
+        loss = 0.
+        if self.loss_target == 'unsupervised':
+            # log barrier functions
+            pred = vals[:, -1:]
+            Ax = scatter(pred.squeeze()[data.A_col] * data.A_val, data.A_row,
+                         reduce='sum', dim=0)
+            loss = loss + barrier_function(data.rhs - Ax).mean()  # b - x >= 0.
+            loss = loss + barrier_function(pred.squeeze()).mean()  # x >= 0.
+            pred = pred * self.std + self.mean
+            pred = log_denormalize(pred)
+            c_times_x = data.obj_const[:, None] * pred
+            obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum').mean()
+            loss = loss + obj_pred
+        else:
+            if 'primal' in self.loss_target:
+                primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight).mean()
+                loss = loss + primal_loss
+            if 'objgap' in self.loss_target:
+                obj_loss = (self.loss_func(self.get_obj_metric(data, vals)) * self.step_weight).mean()
+                loss = loss + obj_loss
+        return loss
 
     def get_obj_metric(self, data, pred):
         pred = pred * self.std + self.mean
@@ -153,8 +170,18 @@ if __name__ == '__main__':
                                                      SubSample(8),
                                                      LogNormalize()]))
 
-    train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)], batch_size=args.batchsize, shuffle=True, num_workers=4, pin_memory=True)
-    val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)], batch_size=args.batchsize, shuffle=False, num_workers=4, pin_memory=True)
+    train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)],
+                              batch_size=args.batchsize,
+                              shuffle=True,
+                              num_workers=4,
+                              pin_memory=True,
+                              collate_fn=collate_fn_ip)
+    val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)],
+                            batch_size=args.batchsize,
+                            shuffle=False,
+                            num_workers=4,
+                            pin_memory=True,
+                            collate_fn=collate_fn_ip)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 

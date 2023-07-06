@@ -6,9 +6,21 @@ from typing import Callable, List, Optional
 
 import numpy as np
 import torch
-from torch_geometric.data import HeteroData, InMemoryDataset
+from torch_geometric.data import Data, Batch, HeteroData, InMemoryDataset
+from torch_sparse import SparseTensor
+
 from scipy_solver.linprog import linprog
-from solver import ipm_overleaf
+
+
+def collate_fn_ip(graphs: List[Data]):
+    new_batch = Batch.from_data_list(graphs)
+    row_bias = torch.hstack([new_batch.A_num_row.new_zeros(1), new_batch.A_num_row[:-1]]).cumsum(dim=0)
+    row_bias = torch.repeat_interleave(row_bias, new_batch.A_nnz)
+    new_batch.A_row += row_bias
+    col_bias = torch.hstack([new_batch.A_num_col.new_zeros(1), new_batch.A_num_col[:-1]]).cumsum(dim=0)
+    col_bias = torch.repeat_interleave(col_bias, new_batch.A_nnz)
+    new_batch.A_col += col_bias
+    return new_batch
 
 
 class SetCoverDataset(InMemoryDataset):
@@ -63,6 +75,14 @@ class SetCoverDataset(InMemoryDataset):
 
             for ip_idx in range(len(ip_pkgs)):
                 (A, b, c) = ip_pkgs[ip_idx]
+                A_tilde = A.clone()
+                A_tilde[:, -A.shape[0]:] = 0.
+                sp_mat = SparseTensor.from_dense(A_tilde, has_value=True)
+
+                row = sp_mat.storage._row
+                col = sp_mat.storage._col
+                val = sp_mat.storage._value
+
                 c = c / c.max()  # does not change the result
 
                 for _ in range(self.rand_starts):
@@ -118,7 +138,15 @@ class SetCoverDataset(InMemoryDataset):
                         # gt_duals=gt_duals,
                         # gt_slacks=gt_slacks,
                         obj_value=torch.tensor(sol['fun'].astype(np.float32)),
-                        obj_const=c)
+                        obj_const=c,
+
+                        A_row=row,
+                        A_col=col,
+                        A_val=val,
+                        A_num_row=A_tilde.shape[0],
+                        A_num_col=A_tilde.shape[1],
+                        A_nnz=len(val),
+                        rhs=b)
 
                     if self.pre_filter is not None:
                         raise NotImplementedError
