@@ -15,8 +15,7 @@ import wandb
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample, LogNormalize
 from data.dataset import SetCoverDataset, collate_fn_ip
 from data.utils import log_denormalize, args_set_bool, barrier_function
-from models.parallel_hetero_gnn import ParallelHeteroGNN
-from models.async_bipartite_gnn import UnParallelHeteroGNN
+from models.hetero_gnn import TripartiteHeteroGNN, BipartiteHeteroGNN
 
 
 def args_parser():
@@ -35,9 +34,9 @@ def args_parser():
     parser.add_argument('--use_bipartite', type=str, default='false')
     parser.add_argument('--loss', type=str, default='primal', choices=['unsupervised', 'primal', 'primal+objgap'])
     parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])
-    parser.add_argument('--parallel', type=str, default='true')
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--use_norm', type=str, default='true')
+    parser.add_argument('--use_res', type=str, default='false')
     parser.add_argument('--patience', type=int, default=100)
     parser.add_argument('--wandbname', type=str, default='default')
     parser.add_argument('--use_wandb', type=str, default='false')
@@ -198,22 +197,21 @@ if __name__ == '__main__':
     best_val_objgap_mean = []
 
     for run in range(args.runs):
-        if not args.parallel:
-            model = UnParallelHeteroGNN(in_shape=2,
+        if args.use_bipartite:
+            model = BipartiteHeteroGNN(in_shape=2,
+                                       pe_dim=args.lappe,
+                                       hid_dim=args.hidden,
+                                       num_layers=args.ipm_steps,
+                                       use_norm=args.use_norm).to(device)
+        else:
+            model = TripartiteHeteroGNN(in_shape=2,
                                         pe_dim=args.lappe,
                                         hid_dim=args.hidden,
                                         num_layers=args.ipm_steps,
-                                        use_norm=args.use_norm).to(device)
-        else:
-            model = ParallelHeteroGNN(bipartite=args.use_bipartite,
-                                      in_shape=2,
-                                      pe_dim=args.lappe,
-                                      hid_dim=args.hidden,
-                                      num_layers=args.ipm_steps,
-                                      dropout=args.dropout,
-                                      share_weight=False,
-                                      use_norm=args.use_norm,
-                                      use_res=False).to(device)
+                                        dropout=args.dropout,
+                                        share_weight=False,
+                                        use_norm=args.use_norm,
+                                        use_res=args.use_res).to(device)
         
         wandb.watch(model, log="all", log_freq=10)
 
