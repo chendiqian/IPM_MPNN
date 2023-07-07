@@ -165,7 +165,7 @@ if __name__ == '__main__':
     dataset = SetCoverDataset(args.datapath,
                               normalize=args.normalize_dataset,
                               rand_starts=args.ipm_restarts,
-                              # transform=SubSample(args.ipm_steps),
+                              transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(8),
                                                      LogNormalize()]))
