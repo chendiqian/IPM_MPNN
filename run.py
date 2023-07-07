@@ -27,6 +27,7 @@ def args_parser():
     parser.add_argument('--ipm_alpha', type=float, default=0.9)
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--lr', type=float, default=1.e-3)
+    parser.add_argument('--weight_decay', type=float, default=0.)
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
@@ -208,7 +209,7 @@ if __name__ == '__main__':
         
         wandb.watch(model, log="all", log_freq=10)
 
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+        optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
 
         trainer = Trainer(device, args.loss, args.losstype, dataset.mean, dataset.std, args.ipm_steps, args.ipm_alpha)
