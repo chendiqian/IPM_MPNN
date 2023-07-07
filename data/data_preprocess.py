@@ -43,7 +43,9 @@ class SubSample:
 
     def __call__(self, data):
         len_seq = data.gt_primals.shape[1]
-        if self.k > len_seq:
+        if self.k == len_seq:
+            return data
+        elif self.k > len_seq:
             data.gt_primals = torch.cat([data.gt_primals,
                                          data.gt_primals[:, -1:].repeat(1, self.k - len_seq)], dim=1)
             if hasattr(data, 'gt_duals'):
