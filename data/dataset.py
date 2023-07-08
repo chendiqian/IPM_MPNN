@@ -10,6 +10,7 @@ from torch_geometric.data import Data, Batch, HeteroData, InMemoryDataset
 from torch_sparse import SparseTensor
 
 from scipy_solver.linprog import linprog
+from solver import ipm_overleaf
 
 
 def collate_fn_ip(graphs: List[Data]):
@@ -87,24 +88,20 @@ class SetCoverDataset(InMemoryDataset):
 
                 for _ in range(self.rand_starts):
                     # solve the LP
-                    # sol = ipm_overleaf(c.numpy(), None, None, A.numpy(), b.numpy(), None, max_iter=1000, lin_solver='scipy_cg')
+                    sol = ipm_overleaf(c.numpy(), None, None, A.numpy(), b.numpy(), None, max_iter=1000, lin_solver='scipy_cg')
 
-                    sol = linprog(c.numpy(),
-                                  A_ub=None,
-                                  b_ub=None,
-                                  A_eq=A.numpy(), b_eq=b.numpy(), bounds=None,
-                                  method='interior-point', callback=lambda res: res.x)
+                    # sol = linprog(c.numpy(),
+                    #               A_ub=None,
+                    #               b_ub=None,
+                    #               A_eq=A.numpy(), b_eq=b.numpy(), bounds=None,
+                    #               method='interior-point', callback=lambda res: res.x)
+                    # x = np.stack(sol.intermediate, axis=1)
 
                     # organize results
-                    # x, l, s = zip(*sol['xs'])
-                    # x = np.stack(x, axis=1)  # primal
+                    x, l, s = zip(*sol['xs'])
+                    x = np.stack(x, axis=1)  # primal
                     # l = np.stack(l, axis=1)  # dual
                     # s = np.stack(s, axis=1)  # slack
-
-                    # x = np.stack([i['x'] for i in sol.intermediate], axis=1)
-                    x = np.stack(sol.intermediate, axis=1)
-
-                    # l = np.stack([i['con'] for i in sol.intermediate], axis=1)
 
                     gt_primals = torch.from_numpy(x).to(torch.float)
                     # gt_duals = torch.from_numpy(l).to(torch.float)
