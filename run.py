@@ -30,7 +30,8 @@ def args_parser():
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--use_bipartite', type=str, default='false')
-    parser.add_argument('--loss', type=str, default='primal', choices=['unsupervised', 'primal', 'primal+objgap'])
+    parser.add_argument('--loss', type=str, default='primal',
+                        choices=['unsupervised', 'primal', 'primal+objgap', 'primal+objgap+constraint'])
     parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--use_norm', type=str, default='true')
