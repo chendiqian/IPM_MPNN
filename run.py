@@ -4,8 +4,7 @@ from ml_collections import ConfigDict
 import numpy as np
 import torch
 from torch import optim
-from torch.utils.data import DataLoader as PT_DataLoader
-from torch_geometric.loader import DataLoader as PyG_DataLoader
+from torch.utils.data import DataLoader
 from torch_geometric.transforms import Compose
 from tqdm import tqdm
 import wandb
@@ -60,25 +59,18 @@ if __name__ == '__main__':
                                                      SubSample(8),
                                                      LogNormalize()]))
 
-    if args.loss == 'unsupervised':
-        Loader = PT_DataLoader
-        collate_fn = collate_fn_ip
-    else:
-        Loader = PyG_DataLoader
-        collate_fn = None
-
-    train_loader = Loader(dataset[:int(len(dataset) * 0.8)],
-                          batch_size=args.batchsize,
-                          shuffle=True,
-                          num_workers=4,
-                          pin_memory=True,
-                          collate_fn=collate_fn)
-    val_loader = Loader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)],
-                        batch_size=args.batchsize,
-                        shuffle=False,
-                        num_workers=4,
-                        pin_memory=True,
-                        collate_fn=collate_fn)
+    train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)],
+                              batch_size=args.batchsize,
+                              shuffle=True,
+                              num_workers=4,
+                              pin_memory=True,
+                              collate_fn=collate_fn_ip)
+    val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)],
+                            batch_size=args.batchsize,
+                            shuffle=False,
+                            num_workers=4,
+                            pin_memory=True,
+                            collate_fn=collate_fn_ip)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
