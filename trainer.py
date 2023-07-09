@@ -76,7 +76,9 @@ class Trainer:
         if self.loss_target == 'unsupervised':
             # log barrier functions
             pred = vals[:, -1:]
-            Ax = scatter(pred.squeeze()[data.A_col] * data.A_val, data.A_row,
+            Ax = scatter(pred.squeeze()[data.A_col[data.A_tilde_mask]] *
+                         data.A_val[data.A_tilde_mask],
+                         data.A_row[data.A_tilde_mask],
                          reduce='sum', dim=0)
             loss = loss + barrier_function(data.rhs - Ax).mean()  # b - x >= 0.
             loss = loss + barrier_function(pred.squeeze()).mean()  # x >= 0.
@@ -92,6 +94,13 @@ class Trainer:
             if 'objgap' in self.loss_target:
                 obj_loss = (self.loss_func(self.get_obj_metric(data, vals, hard_non_negative=False)) * self.step_weight).mean()
                 loss = loss + obj_loss
+            if 'constraint' in self.loss_target:
+                pred = vals * self.std + self.mean
+                pred = log_denormalize(pred)
+                Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
+                constraint_gap = data.rhs[:, None] - Ax
+                cons_loss = (self.loss_func(constraint_gap) * self.step_weight).mean()
+                loss = loss + cons_loss
         return loss
 
     def get_obj_metric(self, data, pred, hard_non_negative=False):
