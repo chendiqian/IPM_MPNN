@@ -32,6 +32,9 @@ def args_parser():
     parser.add_argument('--use_bipartite', type=str, default='false')
     parser.add_argument('--loss', type=str, default='primal',
                         choices=['unsupervised', 'primal', 'primal+objgap', 'primal+objgap+constraint'])
+    parser.add_argument('--loss_weight_x', type=float, default=1.0)
+    parser.add_argument('--loss_weight_obj', type=float, default=1.0)
+    parser.add_argument('--loss_weight_cons', type=float, default=1.0)
     parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])
     parser.add_argument('--dropout', type=float, default=0.)
     parser.add_argument('--use_norm', type=str, default='true')
@@ -100,7 +103,15 @@ if __name__ == '__main__':
         optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
 
-        trainer = Trainer(device, args.loss, args.losstype, dataset.mean, dataset.std, args.ipm_steps, args.ipm_alpha)
+        trainer = Trainer(device,
+                          args.loss,
+                          args.losstype,
+                          dataset.mean, dataset.std,
+                          args.ipm_steps,
+                          args.ipm_alpha,
+                          loss_weight={'primal': args.loss_weight_x,
+                                       'objgap': args.loss_weight_obj,
+                                       'constraint': args.loss_weight_cons})
 
         pbar = tqdm(range(args.epoch))
         for epoch in pbar:

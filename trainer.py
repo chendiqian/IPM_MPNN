@@ -8,7 +8,7 @@ from data.utils import barrier_function, log_denormalize
 
 
 class Trainer:
-    def __init__(self, device, loss_target, loss_type, mean, std, ipm_steps, ipm_alpha):
+    def __init__(self, device, loss_target, loss_type, mean, std, ipm_steps, ipm_alpha, loss_weight):
         assert 0. <= ipm_alpha <= 1.
         self.step_weight = torch.tensor([ipm_alpha ** (ipm_steps - l - 1)
                                          for l in range(ipm_steps)],
@@ -21,6 +21,7 @@ class Trainer:
             self.loss_target = loss_target.split('+')
         else:
             self.loss_target = loss_target
+        self.loss_weight = loss_weight
         if loss_type == 'l2':
             self.loss_func = partial(torch.pow, exponent=2)
         elif loss_type == 'l1':
@@ -90,17 +91,17 @@ class Trainer:
         else:
             if 'primal' in self.loss_target:
                 primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight).mean()
-                loss = loss + primal_loss
+                loss = loss + primal_loss * self.loss_weight['primal']
             if 'objgap' in self.loss_target:
                 obj_loss = (self.loss_func(self.get_obj_metric(data, vals, hard_non_negative=False)) * self.step_weight).mean()
-                loss = loss + obj_loss
+                loss = loss + obj_loss * self.loss_weight['objgap']
             if 'constraint' in self.loss_target:
                 pred = vals * self.std + self.mean
                 pred = log_denormalize(pred)
                 Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
                 constraint_gap = data.rhs[:, None] - Ax
                 cons_loss = (self.loss_func(constraint_gap) * self.step_weight).mean()
-                loss = loss + cons_loss
+                loss = loss + cons_loss * self.loss_weight['constraint']
         return loss
 
     def get_obj_metric(self, data, pred, hard_non_negative=False):
