@@ -76,13 +76,13 @@ class SetCoverDataset(InMemoryDataset):
 
             for ip_idx in range(len(ip_pkgs)):
                 (A, b, c) = ip_pkgs[ip_idx]
-                A_tilde = A.clone()
-                A_tilde[:, -A.shape[0]:] = 0.
-                sp_mat = SparseTensor.from_dense(A_tilde, has_value=True)
+                sp_a = SparseTensor.from_dense(A, has_value=True)
 
-                row = sp_mat.storage._row
-                col = sp_mat.storage._col
-                val = sp_mat.storage._value
+                row = sp_a.storage._row
+                col = sp_a.storage._col
+                val = sp_a.storage._value
+
+                tilde_mask = col < (A.shape[1] - A.shape[0])
 
                 c = c / c.max()  # does not change the result
 
@@ -140,9 +140,10 @@ class SetCoverDataset(InMemoryDataset):
                         A_row=row,
                         A_col=col,
                         A_val=val,
-                        A_num_row=A_tilde.shape[0],
-                        A_num_col=A_tilde.shape[1],
+                        A_num_row=A.shape[0],
+                        A_num_col=A.shape[1],
                         A_nnz=len(val),
+                        A_tilde_mask=tilde_mask,
                         rhs=b)
 
                     if self.pre_filter is not None:
