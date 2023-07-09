@@ -1,13 +1,13 @@
 program: run.py
 method: bayes
 entity: ipmgnn
-project: sweep
-name: sweep
-run_cap: 30
+project: weight_sweep
+name: weight_sweep
+run_cap: 40
 
 metric:
   goal: minimize
-  name: val_loss
+  name: best_val_objgap
 
 parameters:
   runs:
@@ -15,41 +15,60 @@ parameters:
   use_wandb:
     value: True
 
+  datapath:
+    value: /volume/chendi.qian/small_instances
+
+  ipm_restarts:
+    value: 1
+  ipm_steps:
+    value: 8
+
   lappe:
     value: 5
   lr:
     value: 1.e-3
+  weight_decay:
+    value: 1.e-5
   epoch:
-    value: 1000
+    value: 500
   batchsize:
-    value: 32
+    value: 512
+  loss:
+    value: primal+objgap+constraint
+  losstype:
+    value: l2
+  loss_weight_x:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+  loss_weight_obj:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+  loss_weight_cons:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
 
-  ipm_steps:
-    values:
-      - 4
-      - 8
-      - 16
-    distribution: categorical
+  ipm_alpha:
+    min: 0.0
+    max: 1.0
+    distribution: uniform
+
   hidden:
     values:
-      - 32
-      - 64
       - 128
       - 192
-      - 256
-      - 512
     distribution: categorical
   use_bipartite:
-    value: True
-  parallel:
-    values:
-      - True
-      - False
-    distribution: categorical
+    value: false
   use_norm:
-    values:
-      - True
-      - False
-    distribution: categorical
+    value: true
+  use_res:
+    value: false
+  dropout:
+    value: 0.0
   patience:
-    value: 1000
+    value: 100
+  normalize_dataset:
+    value: false
