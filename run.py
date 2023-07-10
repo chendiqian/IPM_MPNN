@@ -45,6 +45,8 @@ def args_parser():
     parser.add_argument('--wandbname', type=str, default='default')
     parser.add_argument('--use_wandb', type=str, default='false')
     parser.add_argument('--normalize_dataset', type=str, default='false')  # does not help
+
+    parser.add_argument('--share_lin_weight', type=str, default='false')
     return parser.parse_args()
 
 
@@ -113,7 +115,8 @@ if __name__ == '__main__':
                                         hid_dim=args.hidden,
                                         num_layers=args.ipm_steps,
                                         dropout=args.dropout,
-                                        share_weight=False,
+                                        share_conv_weight=False,
+                                        share_lin_weight=args.share_lin_weight,
                                         use_norm=args.use_norm,
                                         use_res=args.use_res).to(device)
         
