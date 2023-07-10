@@ -171,8 +171,9 @@ if __name__ == '__main__':
         best_val_objgap_mean.append(trainer.best_val_objgap)
 
         model.load_state_dict(torch.load(os.path.join(log_folder_name, f'run{run}', 'best_model.pt'), map_location=device))
-        test_loss = trainer.eval(test_loader, model, scheduler, test=True)
-        test_gaps = trainer.obj_metric(test_loader, model)
+        with torch.no_grad():
+            test_loss = trainer.eval(test_loader, model, scheduler, test=True)
+            test_gaps = trainer.obj_metric(test_loader, model)
         test_losses.append(test_loss)
         test_objgap_mean.append(test_gaps[:, -1].mean().item())
 

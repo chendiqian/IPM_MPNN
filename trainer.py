@@ -128,6 +128,6 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
-            obj_gap.append(np.abs(self.get_obj_metric(data, vals, hard_non_negative=True).cpu().numpy()))
+            obj_gap.append(np.abs(self.get_obj_metric(data, vals, hard_non_negative=True).detach().cpu().numpy()))
 
         return np.concatenate(obj_gap, axis=0)
