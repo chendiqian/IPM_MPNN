@@ -52,7 +52,7 @@ class Trainer:
 
 
     @torch.no_grad()
-    def eval(self, dataloader, model, scheduler):
+    def eval(self, dataloader, model, scheduler, test=False):
         model.eval()
 
         val_losses = 0.
@@ -64,12 +64,14 @@ class Trainer:
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
-        scheduler.step(val_loss)
-        if val_loss < self.best_val_loss:
-            self.best_val_loss = val_loss
-            self.patience = 0
-        else:
-            self.patience += 1
+
+        if not test:
+            scheduler.step(val_loss)
+            if val_loss < self.best_val_loss:
+                self.best_val_loss = val_loss
+                self.patience = 0
+            else:
+                self.patience += 1
         return val_loss
 
     def get_loss(self, vals, data):
