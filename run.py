@@ -50,7 +50,7 @@ def args_parser():
     parser.add_argument('--num_mlp_layers', type=int, default=2, help='mlp layers within GENConv')
     parser.add_argument('--use_bipartite', type=str, default='false')
     parser.add_argument('--share_conv_weight', type=str, default='false')
-    parser.add_argument('--share_lin_weight', type=str, default='true')
+    parser.add_argument('--share_lin_weight', type=str, default='true')   # does not help
 
     # loss related
     parser.add_argument('--loss', type=str, default='primal+objgap',
