@@ -10,6 +10,7 @@ from data.utils import barrier_function, log_denormalize
 class Trainer:
     def __init__(self, device, loss_target, loss_type, mean, std, ipm_steps, ipm_alpha, loss_weight):
         assert 0. <= ipm_alpha <= 1.
+        self.ipm_steps = ipm_steps
         self.step_weight = torch.tensor([ipm_alpha ** (ipm_steps - l - 1)
                                          for l in range(ipm_steps)],
                                         dtype=torch.float, device=device)[None]
@@ -39,7 +40,8 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             optimizer.zero_grad()
-            vals, cons = model(data)
+            vals, _ = model(data)
+            vals = vals[:, -self.ipm_steps:]
             loss = self.get_loss(vals, data)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -59,7 +61,8 @@ class Trainer:
         num_graphs = 0
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
-            vals, cons = model(data)
+            vals, _ = model(data)
+            vals = vals[:, -self.ipm_steps:]
             loss = self.get_loss(vals, data)
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
@@ -128,6 +131,7 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
+            vals = vals[:, -self.ipm_steps:]
             obj_gap.append(np.abs(self.get_obj_metric(data, vals, hard_non_negative=True).detach().cpu().numpy()))
 
         return np.concatenate(obj_gap, axis=0)

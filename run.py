@@ -20,33 +20,45 @@ from trainer import Trainer
 
 def args_parser():
     parser = argparse.ArgumentParser(description='hyper params for training graph dataset')
+    # admin
     parser.add_argument('--datapath', type=str, required=True)
-    parser.add_argument('--lappe', type=int, default=5)
-    parser.add_argument('--ipm_restarts', type=int, default=10)
+    parser.add_argument('--wandbname', type=str, default='default')
+    parser.add_argument('--use_wandb', type=str, default='false')
+
+    # ipm processing
+    parser.add_argument('--ipm_restarts', type=int, default=1)  # more does not help
     parser.add_argument('--ipm_steps', type=int, default=8)
     parser.add_argument('--ipm_alpha', type=float, default=0.9)
+    parser.add_argument('--normalize_dataset', type=str, default='false')  # does not help
+
+    # training dynamics
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--lr', type=float, default=1.e-3)
     parser.add_argument('--weight_decay', type=float, default=0.)
     parser.add_argument('--epoch', type=int, default=1000)
+    parser.add_argument('--patience', type=int, default=100)
     parser.add_argument('--batchsize', type=int, default=16)
+    parser.add_argument('--dropout', type=float, default=0.)  # must
+    parser.add_argument('--use_norm', type=str, default='true')  # must
+    parser.add_argument('--use_res', type=str, default='false')  # does not help
+
+    # model related
+    parser.add_argument('--lappe', type=int, default=5)
     parser.add_argument('--hidden', type=int, default=128)
+    parser.add_argument('--num_conv_layers', type=int, default=8)
+    parser.add_argument('--num_pred_layers', type=int, default=2)
+    parser.add_argument('--num_mlp_layers', type=int, default=2, help='mlp layers within GENConv')
     parser.add_argument('--use_bipartite', type=str, default='false')
+    parser.add_argument('--share_conv_weight', type=str, default='false')
+    parser.add_argument('--share_lin_weight', type=str, default='true')
+
+    # loss related
     parser.add_argument('--loss', type=str, default='primal+objgap',
                         choices=['unsupervised', 'primal', 'primal+objgap', 'primal+objgap+constraint'])
     parser.add_argument('--loss_weight_x', type=float, default=1.0)
     parser.add_argument('--loss_weight_obj', type=float, default=1.0)
     parser.add_argument('--loss_weight_cons', type=float, default=0.0)  # does not work
     parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])  # no big different
-    parser.add_argument('--dropout', type=float, default=0.)  # must
-    parser.add_argument('--use_norm', type=str, default='true')  # must
-    parser.add_argument('--use_res', type=str, default='false')  # does not help
-    parser.add_argument('--patience', type=int, default=100)
-    parser.add_argument('--wandbname', type=str, default='default')
-    parser.add_argument('--use_wandb', type=str, default='false')
-    parser.add_argument('--normalize_dataset', type=str, default='false')  # does not help
-
-    parser.add_argument('--share_lin_weight', type=str, default='false')
     return parser.parse_args()
 
 
@@ -104,18 +116,21 @@ if __name__ == '__main__':
     for run in range(args.runs):
         os.mkdir(os.path.join(log_folder_name, f'run{run}'))
         if args.use_bipartite:
-            model = BipartiteHeteroGNN(in_shape=2,
-                                       pe_dim=args.lappe,
-                                       hid_dim=args.hidden,
-                                       num_layers=args.ipm_steps,
-                                       use_norm=args.use_norm).to(device)
+            raise NotImplementedError
+            # model = BipartiteHeteroGNN(in_shape=2,
+            #                            pe_dim=args.lappe,
+            #                            hid_dim=args.hidden,
+            #                            num_layers=args.ipm_steps,
+            #                            use_norm=args.use_norm).to(device)
         else:
             model = TripartiteHeteroGNN(in_shape=2,
                                         pe_dim=args.lappe,
                                         hid_dim=args.hidden,
-                                        num_layers=args.ipm_steps,
+                                        num_conv_layers=args.num_conv_layers,
+                                        num_pred_layers=args.num_pred_layers,
+                                        num_mlp_layers=args.num_mlp_layers,
                                         dropout=args.dropout,
-                                        share_conv_weight=False,
+                                        share_conv_weight=args.share_conv_weight,
                                         share_lin_weight=args.share_lin_weight,
                                         use_norm=args.use_norm,
                                         use_res=args.use_res).to(device)

@@ -9,7 +9,9 @@ class TripartiteHeteroGNN(torch.nn.Module):
     def __init__(self, in_shape,
                  pe_dim,
                  hid_dim,
-                 num_layers,
+                 num_conv_layers,
+                 num_pred_layers,
+                 num_mlp_layers,
                  dropout,
                  share_conv_weight,
                  share_lin_weight,
@@ -20,7 +22,7 @@ class TripartiteHeteroGNN(torch.nn.Module):
         self.dropout = dropout
         self.share_conv_weight = share_conv_weight
         self.share_lin_weight = share_lin_weight
-        self.num_layers = num_layers
+        self.num_layers = num_conv_layers
         self.use_res = use_res
 
         self.gcns = torch.nn.ModuleList()
@@ -34,12 +36,13 @@ class TripartiteHeteroGNN(torch.nn.Module):
             'cons': MLP([pe_dim, hid_dim, hid_dim]),
             'obj': MLP([pe_dim, hid_dim, hid_dim])})
 
-        for layer in range(num_layers):
+        for layer in range(num_conv_layers):
             if layer == 0 or not share_conv_weight:
                 self.gcns.append(
                     HeteroConv({
                         ('cons', 'to', 'vals'): GENConv(in_channels=2 * hid_dim,
                                                         out_channels=hid_dim,
+                                                        num_layers=num_mlp_layers,
                                                         aggr='softmax',
                                                         msg_norm=use_norm,
                                                         learn_msg_scale=use_norm,
@@ -48,6 +51,7 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                         edge_dim=1),
                         ('vals', 'to', 'cons'): GENConv(in_channels=2 * hid_dim,
                                                         out_channels=hid_dim,
+                                                        num_layers=num_mlp_layers,
                                                         aggr='softmax',
                                                         msg_norm=use_norm,
                                                         learn_msg_scale=use_norm,
@@ -56,6 +60,7 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                         edge_dim=1),
                         ('vals', 'to', 'obj'): GENConv(in_channels=2 * hid_dim,
                                                        out_channels=hid_dim,
+                                                       num_layers=num_mlp_layers,
                                                        aggr='softmax',
                                                        msg_norm=use_norm,
                                                        learn_msg_scale=use_norm,
@@ -64,6 +69,7 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                        edge_dim=1),
                         ('obj', 'to', 'vals'): GENConv(in_channels=2 * hid_dim,
                                                        out_channels=hid_dim,
+                                                       num_layers=num_mlp_layers,
                                                        aggr='softmax',
                                                        msg_norm=use_norm,
                                                        learn_msg_scale=use_norm,
@@ -72,6 +78,7 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                        edge_dim=1),
                         ('cons', 'to', 'obj'): GENConv(in_channels=2 * hid_dim,
                                                        out_channels=hid_dim,
+                                                       num_layers=num_mlp_layers,
                                                        aggr='softmax',
                                                        msg_norm=use_norm,
                                                        learn_msg_scale=use_norm,
@@ -80,6 +87,7 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                        edge_dim=1),
                         ('obj', 'to', 'cons'): GENConv(in_channels=2 * hid_dim,
                                                        out_channels=hid_dim,
+                                                       num_layers=num_mlp_layers,
                                                        aggr='softmax',
                                                        msg_norm=use_norm,
                                                        learn_msg_scale=use_norm,
@@ -90,14 +98,14 @@ class TripartiteHeteroGNN(torch.nn.Module):
                         aggr='cat'))
 
         if share_lin_weight:
-            self.pred_vals = MLP([2 * hid_dim, hid_dim, 1])
-            self.pred_cons = MLP([2 * hid_dim, hid_dim, 1])
+            self.pred_vals = MLP([2 * hid_dim] + [hid_dim] * (num_pred_layers - 1) + [1])
+            self.pred_cons = MLP([2 * hid_dim] + [hid_dim] * (num_pred_layers - 1) + [1])
         else:
             self.pred_vals = torch.nn.ModuleList()
             self.pred_cons = torch.nn.ModuleList()
-            for layer in range(num_layers):
-                self.pred_vals.append(MLP([2 * hid_dim, hid_dim, 1]))
-                self.pred_cons.append(MLP([2 * hid_dim, hid_dim, 1]))
+            for layer in range(num_conv_layers):
+                self.pred_vals.append(MLP([2 * hid_dim] + [hid_dim] * (num_pred_layers - 1) + [1]))
+                self.pred_cons.append(MLP([2 * hid_dim] + [hid_dim] * (num_pred_layers - 1) + [1]))
 
     def forward(self, data):
         x_dict, edge_index_dict, edge_attr_dict = data.x_dict, data.edge_index_dict, data.edge_attr_dict
