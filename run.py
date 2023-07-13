@@ -51,6 +51,7 @@ def args_parser():
     parser.add_argument('--use_bipartite', type=str, default='false')
     parser.add_argument('--share_conv_weight', type=str, default='false')
     parser.add_argument('--share_lin_weight', type=str, default='true')
+    parser.add_argument('--conv_sequence', type=str, default='parallel')
 
     # loss related
     parser.add_argument('--loss', type=str, default='primal+objgap',
@@ -133,7 +134,8 @@ if __name__ == '__main__':
                                         share_conv_weight=args.share_conv_weight,
                                         share_lin_weight=args.share_lin_weight,
                                         use_norm=args.use_norm,
-                                        use_res=args.use_res).to(device)
+                                        use_res=args.use_res,
+                                        conv_sequence=args.conv_sequence).to(device)
         
         # wandb.watch(model, log="all", log_freq=10)
 
