@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch_scatter import scatter
 
-from data.utils import barrier_function, log_denormalize
+from data.utils import barrier_function
 
 
 class Trainer:
@@ -82,7 +82,6 @@ class Trainer:
 
         if 'obj' in self.loss_target:
             pred = vals * self.std + self.mean
-            pred = log_denormalize(pred)
             c_times_x = data.obj_const[:, None] * pred
             obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
             obj_pred = (self.loss_func(obj_pred) * self.step_weight).mean()
@@ -90,7 +89,6 @@ class Trainer:
         if 'barrier' in self.loss_target:
             raise NotImplementedError("Need to discuss only on the last step or on all")
             # pred = vals * self.std + self.mean
-            # pred = log_denormalize(pred)
             # Ax = scatter(pred.squeeze()[data.A_col[data.A_tilde_mask]] *
             #              data.A_val[data.A_tilde_mask],
             #              data.A_row[data.A_tilde_mask],
@@ -105,7 +103,6 @@ class Trainer:
             loss = loss + obj_loss * self.loss_weight['objgap']
         if 'constraint' in self.loss_target:
             pred = vals * self.std + self.mean
-            pred = log_denormalize(pred)
             Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
             constraint_gap = data.rhs[:, None] - Ax
             cons_loss = (self.loss_func(constraint_gap) * self.step_weight).mean()
@@ -116,13 +113,11 @@ class Trainer:
         # if hard_non_negative, we need a relu to make x all non-negative
         # just for metric usage, not for training
         pred = pred * self.std + self.mean
-        pred = log_denormalize(pred)
         if hard_non_negative:
             pred = torch.relu(pred)
         c_times_x = data.obj_const[:, None] * pred
         obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
         x_gt = data.gt_primals * self.std + self.mean
-        x_gt = log_denormalize(x_gt)
         c_times_xgt = data.obj_const[:, None] * x_gt
         obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
         return (obj_pred - obj_gt) / obj_gt
