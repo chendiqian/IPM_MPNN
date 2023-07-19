@@ -42,8 +42,6 @@ class Trainer:
             data = data.to(self.device)
             optimizer.zero_grad()
             vals, _ = model(data)
-            steps = min(self.ipm_steps, vals.shape[1])
-            vals = vals[:, -steps:]
             loss = self.get_loss(vals, data)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -64,8 +62,6 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
-            steps = min(self.ipm_steps, vals.shape[1])
-            vals = vals[:, -steps:]
             loss = self.get_loss(vals, data)
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
@@ -83,13 +79,11 @@ class Trainer:
     def get_loss(self, vals, data):
         loss = 0.
 
-        steps = vals.shape[1]
-
         if 'obj' in self.loss_target:
-            pred = vals * self.std + self.mean
+            pred = vals[:, -self.ipm_steps:] * self.std + self.mean
             c_times_x = data.obj_const[:, None] * pred
             obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
-            obj_pred = (self.loss_func(obj_pred) * self.step_weight[:, -steps:]).mean()
+            obj_pred = (self.loss_func(obj_pred) * self.step_weight).mean()
             loss = loss + obj_pred
         if 'barrier' in self.loss_target:
             raise NotImplementedError("Need to discuss only on the last step or on all")
@@ -101,14 +95,17 @@ class Trainer:
             # loss = loss + barrier_function(data.rhs - Ax).mean()  # b - x >= 0.
             # loss = loss + barrier_function(pred.squeeze()).mean()  # x >= 0.
         if 'primal' in self.loss_target:
-            primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight[:, -steps:]).mean()
+            primal_loss = (self.loss_func(
+                vals[:, -self.ipm_steps:] -
+                data.gt_primals[:, -self.ipm_steps:]
+            ) * self.step_weight).mean()
             loss = loss + primal_loss * self.loss_weight['primal']
         if 'objgap' in self.loss_target:
-            obj_loss = (self.loss_func(self.get_obj_metric(data, vals, hard_non_negative=False)) * self.step_weight[:, -steps:]).mean()
+            obj_loss = (self.loss_func(self.get_obj_metric(data, vals, hard_non_negative=False)) * self.step_weight).mean()
             loss = loss + obj_loss * self.loss_weight['objgap']
         if 'constraint' in self.loss_target:
             constraint_gap = self.get_constraint_violation(vals, data)
-            cons_loss = (self.loss_func(constraint_gap) * self.step_weight[:, -steps:]).mean()
+            cons_loss = (self.loss_func(constraint_gap) * self.step_weight).mean()
             loss = loss + cons_loss * self.loss_weight['constraint']
         return loss
 
@@ -120,7 +117,7 @@ class Trainer:
         :param data:
         :return:
         """
-        pred = vals * self.std + self.mean
+        pred = vals[:, -self.ipm_steps:] * self.std + self.mean
         Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
         constraint_gap = data.rhs[:, None] - Ax
         return constraint_gap
@@ -128,12 +125,12 @@ class Trainer:
     def get_obj_metric(self, data, pred, hard_non_negative=False):
         # if hard_non_negative, we need a relu to make x all non-negative
         # just for metric usage, not for training
-        pred = pred * self.std + self.mean
+        pred = pred[:, -self.ipm_steps:] * self.std + self.mean
         if hard_non_negative:
             pred = torch.relu(pred)
         c_times_x = data.obj_const[:, None] * pred
         obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
-        x_gt = data.gt_primals * self.std + self.mean
+        x_gt = data.gt_primals[:, -self.ipm_steps:] * self.std + self.mean
         c_times_xgt = data.obj_const[:, None] * x_gt
         obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
         return (obj_pred - obj_gt) / obj_gt
@@ -145,7 +142,6 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
-            vals = vals[:, -self.ipm_steps:]
             obj_gap.append(np.abs(self.get_obj_metric(data, vals, hard_non_negative=True).detach().cpu().numpy()))
 
         return np.concatenate(obj_gap, axis=0)
@@ -157,7 +153,6 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
-            vals = vals[:, -self.ipm_steps:]
             cons_gap.append(np.abs(self.get_constraint_violation(vals, data).detach().cpu().numpy()))
 
         return np.concatenate(cons_gap, axis=0)

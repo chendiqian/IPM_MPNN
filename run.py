@@ -146,7 +146,7 @@ if __name__ == '__main__':
                           args.loss,
                           args.losstype,
                           dataset.mean, dataset.std,
-                          args.ipm_steps,
+                          min(args.ipm_steps, args.num_conv_layers),
                           args.ipm_alpha,
                           loss_weight={'primal': args.loss_weight_x,
                                        'objgap': args.loss_weight_obj,
