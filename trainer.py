@@ -41,7 +41,8 @@ class Trainer:
             data = data.to(self.device)
             optimizer.zero_grad()
             vals, _ = model(data)
-            vals = vals[:, -self.ipm_steps:]
+            steps = min(self.ipm_steps, vals.shape[1])
+            vals = vals[:, -steps:]
             loss = self.get_loss(vals, data)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(),
@@ -62,7 +63,8 @@ class Trainer:
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
             vals, _ = model(data)
-            vals = vals[:, -self.ipm_steps:]
+            steps = min(self.ipm_steps, vals.shape[1])
+            vals = vals[:, -steps:]
             loss = self.get_loss(vals, data)
             val_losses += loss * data.num_graphs
             num_graphs += data.num_graphs
@@ -80,11 +82,13 @@ class Trainer:
     def get_loss(self, vals, data):
         loss = 0.
 
+        steps = vals.shape[1]
+
         if 'obj' in self.loss_target:
             pred = vals * self.std + self.mean
             c_times_x = data.obj_const[:, None] * pred
             obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
-            obj_pred = (self.loss_func(obj_pred) * self.step_weight).mean()
+            obj_pred = (self.loss_func(obj_pred) * self.step_weight[:, -steps:]).mean()
             loss = loss + obj_pred
         if 'barrier' in self.loss_target:
             raise NotImplementedError("Need to discuss only on the last step or on all")
@@ -96,16 +100,16 @@ class Trainer:
             # loss = loss + barrier_function(data.rhs - Ax).mean()  # b - x >= 0.
             # loss = loss + barrier_function(pred.squeeze()).mean()  # x >= 0.
         if 'primal' in self.loss_target:
-            primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight).mean()
+            primal_loss = (self.loss_func(vals - data.gt_primals) * self.step_weight[:, -steps:]).mean()
             loss = loss + primal_loss * self.loss_weight['primal']
         if 'objgap' in self.loss_target:
-            obj_loss = (self.loss_func(self.get_obj_metric(data, vals, hard_non_negative=False)) * self.step_weight).mean()
+            obj_loss = (self.loss_func(self.get_obj_metric(data, vals, hard_non_negative=False)) * self.step_weight[:, -steps:]).mean()
             loss = loss + obj_loss * self.loss_weight['objgap']
         if 'constraint' in self.loss_target:
             pred = vals * self.std + self.mean
             Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
             constraint_gap = data.rhs[:, None] - Ax
-            cons_loss = (self.loss_func(constraint_gap) * self.step_weight).mean()
+            cons_loss = (self.loss_func(constraint_gap) * self.step_weight[:, -steps:]).mean()
             loss = loss + cons_loss * self.loss_weight['constraint']
         return loss
 
