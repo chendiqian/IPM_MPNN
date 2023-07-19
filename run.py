@@ -54,10 +54,10 @@ def args_parser():
     parser.add_argument('--conv_sequence', type=str, default='parallel')
 
     # loss related
-    parser.add_argument('--loss', type=str, default='primal+objgap')
+    parser.add_argument('--loss', type=str, default='primal+objgap+constraint')
     parser.add_argument('--loss_weight_x', type=float, default=1.0)
     parser.add_argument('--loss_weight_obj', type=float, default=1.0)
-    parser.add_argument('--loss_weight_cons', type=float, default=0.0)  # does not work
+    parser.add_argument('--loss_weight_cons', type=float, default=1.0)  # does not work
     parser.add_argument('--losstype', type=str, default='l2', choices=['l1', 'l2'])  # no big different
     return parser.parse_args()
 
