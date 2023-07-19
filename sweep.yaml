@@ -2,9 +2,9 @@ program: run.py
 method: bayes
 #method: grid
 entity: ipmgnn
-project: new_sweep
-name: new_sweep
-run_cap: 20
+project: full_loss_sweep
+name: full_loss_sweep
+run_cap: 40
 
 metric:
   goal: minimize
@@ -29,7 +29,7 @@ parameters:
   lr:
     value: 1.e-3
   weight_decay:
-    min: 1.e-7
+    min: 1.e-6
     max: 5.e-5
     distribution: log_uniform_values
   epoch:
@@ -37,15 +37,21 @@ parameters:
   batchsize:
     value: 512
   loss:
-    value: primal+objgap
+    values: primal+objgap+constraint
   losstype:
     value: l2
   loss_weight_x:
-    value: 1.
+    min: 0.1
+    max: 10.
+    distribution: uniform
   loss_weight_obj:
-    value: 1.
+    min: 0.1
+    max: 10.
+    distribution: uniform
   loss_weight_cons:
-    value: 0.
+    min: 0.1
+    max: 10.
+    distribution: uniform
 
   ipm_alpha:
     min: 0.
@@ -53,11 +59,9 @@ parameters:
     distribution: uniform
 
   hidden:
-    values:
-      - 128
-      - 160
-      - 192
-    distribution: categorical
+    min: 128
+    max: 192
+    distribution: int_uniform
   num_conv_layers:
     value: 8
   num_pred_layers:
@@ -80,3 +84,13 @@ parameters:
     value: false
   share_lin_weight:
     value: true
+  conv_sequence:
+    value: 'cov'
+##      - 'parallel'
+#      - 'cvo'
+#      - 'cov'
+#      - 'vco'
+#      - 'voc'
+#      - 'ocv'
+#      - 'ovc'
+#    distribution: categorical
