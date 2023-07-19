@@ -14,15 +14,12 @@ class Trainer:
         self.step_weight = torch.tensor([ipm_alpha ** (ipm_steps - l - 1)
                                          for l in range(ipm_steps)],
                                         dtype=torch.float, device=device)[None]
-        self.best_val_loss = 1.e8
+        # self.best_val_loss = 1.e8
         self.best_val_objgap = 100.
         self.best_val_consgap = 100.
         self.patience = 0
         self.device = device
-        if loss_target != 'unsupervised':
-            self.loss_target = loss_target.split('+')
-        else:
-            self.loss_target = loss_target
+        self.loss_target = loss_target.split('+')
         self.loss_weight = loss_weight
         if loss_type == 'l2':
             self.loss_func = partial(torch.pow, exponent=2)
@@ -54,7 +51,7 @@ class Trainer:
 
 
     @torch.no_grad()
-    def eval(self, dataloader, model, scheduler, test=False):
+    def eval(self, dataloader, model, scheduler = None):
         model.eval()
 
         val_losses = 0.
@@ -67,13 +64,8 @@ class Trainer:
             num_graphs += data.num_graphs
         val_loss = val_losses.item() / num_graphs
 
-        if not test:
+        if scheduler is not None:
             scheduler.step(val_loss)
-            if val_loss < self.best_val_loss:
-                self.best_val_loss = val_loss
-                self.patience = 0
-            else:
-                self.patience += 1
         return val_loss
 
     def get_loss(self, vals, data):

@@ -167,9 +167,12 @@ if __name__ == '__main__':
                 # metric to cache the best model
                 cur_mean_gap = val_gaps[:, -1].mean().item()
                 if trainer.best_val_objgap > cur_mean_gap:
+                    trainer.patience = 0
                     trainer.best_val_objgap = cur_mean_gap
                     trainer.best_val_consgap = val_constraint_gap[:, -1].mean().item()
                     torch.save(model.state_dict(), os.path.join(log_folder_name, f'run{run}', 'best_model.pt'))
+                else:
+                    trainer.patience += 1
 
             if trainer.patience > args.patience:
                 break
@@ -197,7 +200,7 @@ if __name__ == '__main__':
 
         model.load_state_dict(torch.load(os.path.join(log_folder_name, f'run{run}', 'best_model.pt'), map_location=device))
         with torch.no_grad():
-            # test_loss = trainer.eval(test_loader, model, scheduler, test=True)
+            # test_loss = trainer.eval(test_loader, model, None)
             test_gaps = trainer.obj_metric(test_loader, model)
             test_cons_gap = trainer.constraint_metric(test_loader, model)
         # test_losses.append(test_loss)
