@@ -107,10 +107,12 @@ if __name__ == '__main__':
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    best_val_losses = []
+    # best_val_losses = []
     best_val_objgap_mean = []
-    test_losses = []
+    best_val_consgap_mean = []
+    # test_losses = []
     test_objgap_mean = []
+    test_consgap_mean = []
 
     for run in range(args.runs):
         os.mkdir(os.path.join(log_folder_name, f'run{run}'))
@@ -153,14 +155,20 @@ if __name__ == '__main__':
         pbar = tqdm(range(args.epoch))
         for epoch in pbar:
             train_loss = trainer.train(train_loader, model, optimizer)
-            val_loss = trainer.eval(val_loader, model, scheduler)
 
             with torch.no_grad():
+                val_loss = trainer.eval(val_loader, model, scheduler)
                 train_gaps = trainer.obj_metric(train_loader, model)
                 val_gaps = trainer.obj_metric(val_loader, model)
+
+                train_constraint_gap = trainer.constraint_metric(train_loader, model)
+                val_constraint_gap = trainer.constraint_metric(val_loader, model)
+
+                # metric to cache the best model
                 cur_mean_gap = val_gaps[:, -1].mean().item()
                 if trainer.best_val_objgap > cur_mean_gap:
                     trainer.best_val_objgap = cur_mean_gap
+                    trainer.best_val_consgap = val_constraint_gap[:, -1].mean().item()
                     torch.save(model.state_dict(), os.path.join(log_folder_name, f'run{run}', 'best_model.pt'))
 
             if trainer.patience > args.patience:
@@ -176,20 +184,33 @@ if __name__ == '__main__':
             for gnn_l in range(val_gaps.shape[1]):
                 log_dict[f'val_obj_gap_l{gnn_l}_mean'] = val_gaps[:, gnn_l].mean()
                 log_dict[f'val_obj_gap_l{gnn_l}'] = wandb.Histogram(val_gaps[:, gnn_l])
+            for gnn_l in range(train_constraint_gap.shape[1]):
+                log_dict[f'train_cons_gap_l{gnn_l}_mean'] = train_constraint_gap[:, gnn_l].mean()
+                log_dict[f'train_cons_gap_l{gnn_l}'] = wandb.Histogram(train_constraint_gap[:, gnn_l])
+            for gnn_l in range(val_constraint_gap.shape[1]):
+                log_dict[f'val_cons_gap_l{gnn_l}_mean'] = val_constraint_gap[:, gnn_l].mean()
+                log_dict[f'val_cons_gap_l{gnn_l}'] = wandb.Histogram(val_constraint_gap[:, gnn_l])
             wandb.log(log_dict)
-        best_val_losses.append(trainer.best_val_loss)
+        # best_val_losses.append(trainer.best_val_loss)
         best_val_objgap_mean.append(trainer.best_val_objgap)
+        best_val_consgap_mean.append(trainer.best_val_consgap)
 
         model.load_state_dict(torch.load(os.path.join(log_folder_name, f'run{run}', 'best_model.pt'), map_location=device))
         with torch.no_grad():
-            test_loss = trainer.eval(test_loader, model, scheduler, test=True)
+            # test_loss = trainer.eval(test_loader, model, scheduler, test=True)
             test_gaps = trainer.obj_metric(test_loader, model)
-        test_losses.append(test_loss)
+            test_cons_gap = trainer.constraint_metric(test_loader, model)
+        # test_losses.append(test_loss)
         test_objgap_mean.append(test_gaps[:, -1].mean().item())
+        test_cons_gap.append(test_cons_gap[:, -1].mean().item())
 
-    wandb.log({'best_val_loss': np.mean(best_val_losses),
-               'best_val_objgap': np.mean(best_val_objgap_mean),
-               'test_loss_mean': np.mean(test_losses),
-               'test_loss_std': np.std(test_losses),
-               'test_objgap_mean': np.mean(test_objgap_mean),
-               'test_objgap_std': np.std(test_objgap_mean)})
+    wandb.log({
+        # 'best_val_loss': np.mean(best_val_losses),
+        'best_val_objgap': np.mean(best_val_objgap_mean),
+        # 'test_loss_mean': np.mean(test_losses),
+        # 'test_loss_std': np.std(test_losses),
+        'test_objgap_mean': np.mean(test_objgap_mean),
+        'test_objgap_std': np.std(test_objgap_mean),
+        'test_consgap_mean': np.mean(test_cons_gap),
+        'test_consgap_std': np.std(test_cons_gap),
+    })

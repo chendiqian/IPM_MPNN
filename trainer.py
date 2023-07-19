@@ -16,6 +16,7 @@ class Trainer:
                                         dtype=torch.float, device=device)[None]
         self.best_val_loss = 1.e8
         self.best_val_objgap = 100.
+        self.best_val_consgap = 100.
         self.patience = 0
         self.device = device
         if loss_target != 'unsupervised':
@@ -106,12 +107,23 @@ class Trainer:
             obj_loss = (self.loss_func(self.get_obj_metric(data, vals, hard_non_negative=False)) * self.step_weight[:, -steps:]).mean()
             loss = loss + obj_loss * self.loss_weight['objgap']
         if 'constraint' in self.loss_target:
-            pred = vals * self.std + self.mean
-            Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
-            constraint_gap = data.rhs[:, None] - Ax
+            constraint_gap = self.get_constraint_violation(vals, data)
             cons_loss = (self.loss_func(constraint_gap) * self.step_weight[:, -steps:]).mean()
             loss = loss + cons_loss * self.loss_weight['constraint']
         return loss
+
+    def get_constraint_violation(self, vals, data):
+        """
+        b - Ax
+
+        :param vals:
+        :param data:
+        :return:
+        """
+        pred = vals * self.std + self.mean
+        Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
+        constraint_gap = data.rhs[:, None] - Ax
+        return constraint_gap
 
     def get_obj_metric(self, data, pred, hard_non_negative=False):
         # if hard_non_negative, we need a relu to make x all non-negative
@@ -137,3 +149,15 @@ class Trainer:
             obj_gap.append(np.abs(self.get_obj_metric(data, vals, hard_non_negative=True).detach().cpu().numpy()))
 
         return np.concatenate(obj_gap, axis=0)
+
+    def constraint_metric(self, dataloader, model):
+        model.eval()
+
+        cons_gap = []
+        for i, data in enumerate(dataloader):
+            data = data.to(self.device)
+            vals, _ = model(data)
+            vals = vals[:, -self.ipm_steps:]
+            cons_gap.append(np.abs(self.get_constraint_violation(vals, data).detach().cpu().numpy()))
+
+        return np.concatenate(cons_gap, axis=0)
