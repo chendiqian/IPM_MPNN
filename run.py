@@ -205,7 +205,7 @@ if __name__ == '__main__':
             test_cons_gap = trainer.constraint_metric(test_loader, model)
         # test_losses.append(test_loss)
         test_objgap_mean.append(test_gaps[:, -1].mean().item())
-        test_cons_gap.append(test_cons_gap[:, -1].mean().item())
+        test_consgap_mean.append(test_cons_gap[:, -1].mean().item())
 
     wandb.log({
         # 'best_val_loss': np.mean(best_val_losses),
@@ -214,6 +214,6 @@ if __name__ == '__main__':
         # 'test_loss_std': np.std(test_losses),
         'test_objgap_mean': np.mean(test_objgap_mean),
         'test_objgap_std': np.std(test_objgap_mean),
-        'test_consgap_mean': np.mean(test_cons_gap),
-        'test_consgap_std': np.std(test_cons_gap),
+        'test_consgap_mean': np.mean(test_consgap_mean),
+        'test_consgap_std': np.std(test_consgap_mean),
     })
