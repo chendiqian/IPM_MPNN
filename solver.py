@@ -347,14 +347,14 @@ def ipm_overleaf(c,
                 break
             last_x = x
             # intermediate_xs.append(_postsolve(x, postsolve_args)[0])
-            intermediate_xs.append((x, lambd, s))
+            intermediate_xs.append(_postsolve(x, postsolve_args)[0])
         except (LinAlgError, FloatingPointError, ValueError, ZeroDivisionError):
             warnings.warn(f'Instability occured at iter {iteration}, turning to lstsq')
             lin_solver = 'lstsq'
 
-        x, fun, slack, con = _postsolve(x, postsolve_args)
-        pbar.set_postfix({'lin_system_steps': lin_system_steps, 'obj': fun})
+        pbar.set_postfix({'lin_system_steps': lin_system_steps})
 
+    x, fun, slack, con = _postsolve(x, postsolve_args)
     sol = {
         'x': x,
         'xs': intermediate_xs,
