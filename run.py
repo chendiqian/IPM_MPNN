@@ -67,6 +67,9 @@ if __name__ == '__main__':
     args = args_set_bool(vars(args))
     args = ConfigDict(args)
 
+    # Be careful when generating instances
+    using_ineq_instance = args.datapath.startswith('ineq')
+
     if not os.path.isdir('logs'):
         os.mkdir('logs')
     exist_runs = [d for d in os.listdir('logs') if d.startswith('exp')]
@@ -80,6 +83,7 @@ if __name__ == '__main__':
                entity="ipmgnn")
 
     dataset = SetCoverDataset(args.datapath,
+                              using_ineq=using_ineq_instance,
                               normalize=args.normalize_dataset,
                               rand_starts=args.ipm_restarts,
                               transform=SubSample(args.ipm_steps),
@@ -150,7 +154,8 @@ if __name__ == '__main__':
                           args.ipm_alpha,
                           loss_weight={'primal': args.loss_weight_x,
                                        'objgap': args.loss_weight_obj,
-                                       'constraint': args.loss_weight_cons})
+                                       'constraint': args.loss_weight_cons},
+                          using_ineq=using_ineq_instance)
 
         pbar = tqdm(range(args.epoch))
         for epoch in pbar:

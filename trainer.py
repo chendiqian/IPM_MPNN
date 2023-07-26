@@ -8,9 +8,10 @@ from data.utils import barrier_function
 
 
 class Trainer:
-    def __init__(self, device, loss_target, loss_type, mean, std, ipm_steps, ipm_alpha, loss_weight):
+    def __init__(self, device, loss_target, loss_type, mean, std, ipm_steps, ipm_alpha, loss_weight, using_ineq):
         assert 0. <= ipm_alpha <= 1.
         self.ipm_steps = ipm_steps
+        self.using_ineq = using_ineq
         self.step_weight = torch.tensor([ipm_alpha ** (ipm_steps - l - 1)
                                          for l in range(ipm_steps)],
                                         dtype=torch.float, device=device)[None]
@@ -103,7 +104,7 @@ class Trainer:
 
     def get_constraint_violation(self, vals, data):
         """
-        b - Ax
+        Ax - b
 
         :param vals:
         :param data:
@@ -111,7 +112,10 @@ class Trainer:
         """
         pred = vals[:, -self.ipm_steps:] * self.std + self.mean
         Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
-        constraint_gap = data.rhs[:, None] - Ax
+        constraint_gap = Ax - data.rhs[:, None]
+        if self.using_ineq:
+            # Ax - b <= 0 will not be punished
+            constraint_gap = torch.relu(constraint_gap)
         return constraint_gap
 
     def get_obj_metric(self, data, pred, hard_non_negative=False):
@@ -139,6 +143,14 @@ class Trainer:
         return np.concatenate(obj_gap, axis=0)
 
     def constraint_metric(self, dataloader, model):
+        """
+        minimize ||Ax - b||^p in case of equality constraints
+         ||relu(Ax - b)||^p in case of inequality
+
+        :param dataloader:
+        :param model:
+        :return:
+        """
         model.eval()
 
         cons_gap = []

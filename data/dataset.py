@@ -29,6 +29,7 @@ class SetCoverDataset(InMemoryDataset):
     def __init__(
         self,
         root: str,
+        using_ineq: bool,
         normalize: bool,
         rand_starts: int = 10,
         transform: Optional[Callable] = None,
@@ -36,6 +37,7 @@ class SetCoverDataset(InMemoryDataset):
         pre_filter: Optional[Callable] = None,
     ):
         self.rand_starts = rand_starts
+        self.using_ineq = using_ineq
         super().__init__(root, transform, pre_transform, pre_filter)
         path = osp.join(self.processed_dir, 'data.pt')
         self.data, self.slices = torch.load(path)
@@ -82,13 +84,27 @@ class SetCoverDataset(InMemoryDataset):
                 col = sp_a.storage._col
                 val = sp_a.storage._value
 
-                tilde_mask = col < (A.shape[1] - A.shape[0])
+                if self.using_ineq:
+                    tilde_mask = torch.ones(row.shape, dtype=torch.bool)
+                else:
+                    tilde_mask = col < (A.shape[1] - A.shape[0])
 
                 c = c / c.max()  # does not change the result
 
+                # solve the LP
+                if self.using_ineq:
+                    A_ub = A.numpy()
+                    b_ub = b.numpy()
+                    A_eq = None
+                    b_eq = None
+                else:
+                    A_eq = A.numpy()
+                    b_eq = b.numpy()
+                    A_ub = None
+                    b_ub = None
+
                 for _ in range(self.rand_starts):
-                    # solve the LP
-                    sol = ipm_overleaf(c.numpy(), None, None, A.numpy(), b.numpy(), None, max_iter=1000, lin_solver='scipy_cg')
+                    sol = ipm_overleaf(c.numpy(), A_ub, b_ub, A_eq, b_eq, None, max_iter=1000, lin_solver='scipy_cg')
 
                     # sol = linprog(c.numpy(),
                     #               A_ub=None,
@@ -98,8 +114,8 @@ class SetCoverDataset(InMemoryDataset):
                     # x = np.stack(sol.intermediate, axis=1)
 
                     # organize results
-                    x, l, s = zip(*sol['xs'])
-                    x = np.stack(x, axis=1)  # primal
+                    # x, l, s = zip(*sol['xs'])
+                    x = np.stack(sol['xs'], axis=1)  # primal
                     # l = np.stack(l, axis=1)  # dual
                     # s = np.stack(s, axis=1)  # slack
 
