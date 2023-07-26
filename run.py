@@ -80,7 +80,7 @@ if __name__ == '__main__':
 
     wandb.init(project=args.wandbname, mode="online" if args.use_wandb else "disabled",
                config=vars(args),
-               entity="ipmgnn")
+               entity="chendiqian")
 
     dataset = SetCoverDataset(args.datapath,
                               using_ineq=using_ineq_instance,
