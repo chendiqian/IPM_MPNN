@@ -37,7 +37,7 @@ parameters:
   batchsize:
     value: 512
   loss:
-    values: primal+objgap+constraint
+    value: primal+objgap+constraint
   losstype:
     value: l2
   loss_weight_x:
