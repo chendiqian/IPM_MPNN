@@ -2,8 +2,8 @@ program: run.py
 method: bayes
 #method: grid
 entity: ipmgnn
-project: full_loss_sweep
-name: full_loss_sweep
+project: ineq_sweep
+name: ineq_sweep
 run_cap: 40
 
 metric:
@@ -17,7 +17,7 @@ parameters:
     value: True
 
   datapath:
-    value: /volume/chendi.qian/small_instances
+    value: /volume/chendi.qian/ineq_small_instances
 
   ipm_restarts:
     value: 1
