@@ -68,7 +68,7 @@ if __name__ == '__main__':
     args = ConfigDict(args)
 
     # Be careful when generating instances
-    using_ineq_instance = args.datapath.startswith('ineq')
+    using_ineq_instance = os.path.split(args.datapath)[-1].startswith('ineq')
 
     if not os.path.isdir('logs'):
         os.mkdir('logs')
