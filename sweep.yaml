@@ -1,7 +1,7 @@
 program: run.py
 method: bayes
 #method: grid
-entity: ipmgnn
+entity: chendiqian
 project: ineq_fullloss_sweep
 name: ineq_fullloss_sweep
 run_cap: 40
