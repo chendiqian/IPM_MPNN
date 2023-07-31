@@ -89,7 +89,7 @@ class SetCoverDataset(InMemoryDataset):
                 else:
                     tilde_mask = col < (A.shape[1] - A.shape[0])
 
-                c = c / c.max()  # does not change the result
+                c = c / (c.abs().max() + 1.e-10)  # does not change the result
 
                 # solve the LP
                 if self.using_ineq:
