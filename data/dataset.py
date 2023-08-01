@@ -170,4 +170,10 @@ class SetCoverDataset(InMemoryDataset):
 
                     data_list.append(data)
 
+            torch.save(Batch.from_data_list(data_list), osp.join(self.processed_dir, f'batch{i}.pt'))
+            data_list = []
+
+        data_list = []
+        for i in range(num_instance_pkg):
+            data_list.extend(Batch.to_data_list(torch.load(osp.join(self.processed_dir, f'batch{i}.pt'))))
         torch.save(self.collate(data_list), osp.join(self.processed_dir, 'data.pt'))
