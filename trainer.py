@@ -8,7 +8,17 @@ from data.utils import barrier_function
 
 
 class Trainer:
-    def __init__(self, device, loss_target, loss_type, mean, std, ipm_steps, ipm_alpha, loss_weight, using_ineq):
+    def __init__(self,
+                 device,
+                 loss_target,
+                 loss_type,
+                 mean,
+                 std,
+                 micro_batch,
+                 ipm_steps,
+                 ipm_alpha,
+                 loss_weight,
+                 using_ineq):
         assert 0. <= ipm_alpha <= 1.
         self.ipm_steps = ipm_steps
         self.using_ineq = using_ineq
@@ -30,24 +40,39 @@ class Trainer:
             raise ValueError
         self.mean = mean
         self.std = std
+        self.micro_batch = micro_batch
 
     def train(self, dataloader, model, optimizer):
         model.train()
+        optimizer.zero_grad()
+
+        update_count = 0
+        micro_batch = int(min(self.micro_batch, len(dataloader)))
+        loss_scaling_lst = [micro_batch] * (len(dataloader) // micro_batch) + [len(dataloader) % micro_batch]
 
         train_losses = 0.
         num_graphs = 0
         for i, data in enumerate(dataloader):
             data = data.to(self.device)
-            optimizer.zero_grad()
             vals, _ = model(data)
             loss = self.get_loss(vals, data)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(),
-                                           max_norm=1.0,
-                                           error_if_nonfinite=True)
-            optimizer.step()
-            train_losses += loss * data.num_graphs
+
+            train_losses += loss.detach() * data.num_graphs
             num_graphs += data.num_graphs
+
+            update_count += 1
+            loss = loss / float(loss_scaling_lst[0])  # scale the loss
+            loss.backward()
+
+            if update_count >= micro_batch or i == len(dataloader) - 1:
+                torch.nn.utils.clip_grad_norm_(model.parameters(),
+                                               max_norm=1.0,
+                                               error_if_nonfinite=True)
+                optimizer.step()
+                optimizer.zero_grad()
+                update_count = 0
+                loss_scaling_lst.pop(0)
+
         return train_losses.item() / num_graphs
 
 

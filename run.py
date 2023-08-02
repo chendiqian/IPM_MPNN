@@ -38,6 +38,7 @@ def args_parser():
     parser.add_argument('--epoch', type=int, default=1000)
     parser.add_argument('--patience', type=int, default=100)
     parser.add_argument('--batchsize', type=int, default=16)
+    parser.add_argument('--micro_batch', type=int, default=1)
     parser.add_argument('--dropout', type=float, default=0.)  # must
     parser.add_argument('--use_norm', type=str, default='true')  # must
     parser.add_argument('--use_res', type=str, default='false')  # does not help
@@ -150,6 +151,7 @@ if __name__ == '__main__':
                           args.loss,
                           args.losstype,
                           dataset.mean, dataset.std,
+                          args.micro_batch,
                           min(args.ipm_steps, args.num_conv_layers),
                           args.ipm_alpha,
                           loss_weight={'primal': args.loss_weight_x,
