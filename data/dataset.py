@@ -105,19 +105,14 @@ class SetCoverDataset(InMemoryDataset):
 
                 for _ in range(self.rand_starts):
                     sol = ipm_overleaf(c.numpy(), A_ub, b_ub, A_eq, b_eq, None, max_iter=1000, lin_solver='scipy_cg')
+                    x = np.stack(sol['xs'], axis=1)  # primal
 
                     # sol = linprog(c.numpy(),
-                    #               A_ub=None,
-                    #               b_ub=None,
-                    #               A_eq=A.numpy(), b_eq=b.numpy(), bounds=None,
+                    #               A_ub=A_ub,
+                    #               b_ub=b_ub,
+                    #               A_eq=A_eq, b_eq=b_eq, bounds=None,
                     #               method='interior-point', callback=lambda res: res.x)
                     # x = np.stack(sol.intermediate, axis=1)
-
-                    # organize results
-                    # x, l, s = zip(*sol['xs'])
-                    x = np.stack(sol['xs'], axis=1)  # primal
-                    # l = np.stack(l, axis=1)  # dual
-                    # s = np.stack(s, axis=1)  # slack
 
                     gt_primals = torch.from_numpy(x).to(torch.float)
                     # gt_duals = torch.from_numpy(l).to(torch.float)
