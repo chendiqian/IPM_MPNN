@@ -28,10 +28,10 @@ def linprog(c, A_ub=None, b_ub=None, A_eq=None, b_eq=None,
     rr_method = solver_options.pop('rr_method', None)  # need to pop these;
     rr = solver_options.pop('rr', True)  # they're not passed to methods
     c0 = 0  # we might get a constant term in the objective
-    if solver_options.pop('presolve', True):
-        (lp, c0, x, undo, complete, status, message) = _presolve(lp, rr,
-                                                                 rr_method,
-                                                                 tol)
+    (lp, c0, x, undo, complete, status, message) = _presolve(lp, rr,
+                                                             rr_method,
+                                                             tol)
+    assert not complete
 
     C, b_scale = 1, 1  # for trivial unscaling if autoscale is not used
     postsolve_args = (lp_o._replace(bounds=lp.bounds), undo, C, b_scale)

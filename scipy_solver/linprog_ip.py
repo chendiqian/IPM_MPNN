@@ -42,6 +42,26 @@ def _get_rand_start(shape):
     return x0, y0, z0, tau0, kappa0
 
 
+def _get_blind_start(shape):
+    """
+    Return the starting point from [4] 4.4
+
+    References
+    ----------
+    .. [4] Andersen, Erling D., and Knud D. Andersen. "The MOSEK interior point
+           optimizer for linear programming: an implementation of the
+           homogeneous algorithm." High performance optimization. Springer US,
+           2000. 197-232.
+
+    """
+    m, n = shape
+    x0 = np.ones(n)
+    y0 = np.zeros(m)
+    z0 = np.ones(n)
+    tau0 = 1
+    kappa0 = 1
+    return x0, y0, z0, tau0, kappa0
+
 
 def _ip_hsd(A, b, c, c0, alpha0, beta, maxiter, disp, tol, sparse, lstsq,
             sym_pos, cholesky, pc, ip, permc_spec, callback, postsolve_args):
@@ -49,7 +69,7 @@ def _ip_hsd(A, b, c, c0, alpha0, beta, maxiter, disp, tol, sparse, lstsq,
     iteration = 0
 
     # default initial point
-    x, y, z, tau, kappa = _get_rand_start(A.shape)
+    x, y, z, tau, kappa = _get_blind_start(A.shape)
 
     # first iteration is special improvement of initial point
     ip = ip if pc else False
