@@ -22,7 +22,8 @@ def args_parser():
     parser = argparse.ArgumentParser(description='hyper params for training graph dataset')
     # admin
     parser.add_argument('--datapath', type=str, required=True)
-    parser.add_argument('--wandbname', type=str, default='default')
+    parser.add_argument('--wandbproject', type=str, default='default')
+    parser.add_argument('--wandbname', type=str, default='')
     parser.add_argument('--use_wandb', type=str, default='false')
 
     # ipm processing
@@ -79,9 +80,11 @@ if __name__ == '__main__':
     with open(os.path.join(log_folder_name, 'config.yaml'), 'w') as outfile:
         yaml.dump(args.to_dict(), outfile, default_flow_style=False)
 
-    wandb.init(project=args.wandbname, mode="online" if args.use_wandb else "disabled",
+    wandb.init(project=args.wandbproject,
+               name=args.wandbname if args.wandbname else None,
+               mode="online" if args.use_wandb else "disabled",
                config=vars(args),
-               entity="chendiqian")
+               entity="chendiqian")  # use your own entity
 
     dataset = SetCoverDataset(args.datapath,
                               using_ineq=using_ineq_instance,
@@ -213,6 +216,10 @@ if __name__ == '__main__':
         # test_losses.append(test_loss)
         test_objgap_mean.append(test_gaps[:, -1].mean().item())
         test_consgap_mean.append(test_cons_gap[:, -1].mean().item())
+
+        wandb.log({'test_objgap': test_objgap_mean[-1]})
+        wandb.log({'test_consgap': test_consgap_mean[-1]})
+
 
     wandb.log({
         # 'best_val_loss': np.mean(best_val_losses),
