@@ -87,12 +87,12 @@ if __name__ == '__main__':
                entity="chendiqian")  # use your own entity
 
     dataset = SetCoverDataset(args.datapath,
+                              extra_path=f'{args.ipm_restarts}restarts_{args.lappe}lap_{args.ipm_steps}steps',
                               using_ineq=using_ineq_instance,
                               normalize=args.normalize_dataset,
                               rand_starts=args.ipm_restarts,
-                              transform=SubSample(args.ipm_steps),
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
-                                                     SubSample(8)]))
+                                                     SubSample(args.ipm_steps)]))
 
     train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)],
                               batch_size=args.batchsize,

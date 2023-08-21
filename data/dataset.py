@@ -29,6 +29,7 @@ class SetCoverDataset(InMemoryDataset):
     def __init__(
         self,
         root: str,
+        extra_path: str,
         using_ineq: bool,
         normalize: bool,
         rand_starts: int = 10,
@@ -38,6 +39,7 @@ class SetCoverDataset(InMemoryDataset):
     ):
         self.rand_starts = rand_starts
         self.using_ineq = using_ineq
+        self.extra_path = extra_path
         super().__init__(root, transform, pre_transform, pre_filter)
         path = osp.join(self.processed_dir, 'data.pt')
         self.data, self.slices = torch.load(path)
@@ -60,7 +62,7 @@ class SetCoverDataset(InMemoryDataset):
 
     @property
     def processed_dir(self) -> str:
-        return osp.join(self.root, f'processed_{self.rand_starts}restarts')
+        return osp.join(self.root, 'processed_' + self.extra_path)
 
     @property
     def processed_file_names(self) -> List[str]:
