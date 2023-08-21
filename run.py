@@ -230,4 +230,5 @@ if __name__ == '__main__':
         'test_objgap_std': np.std(test_objgap_mean),
         'test_consgap_mean': np.mean(test_consgap_mean),
         'test_consgap_std': np.std(test_consgap_mean),
+        'test_hybrid_gap': np.mean(test_objgap_mean) + np.mean(test_consgap_mean),  # for the sweep
     })
