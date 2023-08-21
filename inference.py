@@ -1,0 +1,138 @@
+import argparse
+import logging
+import os
+
+import numpy as np
+import torch
+import wandb
+from ml_collections import ConfigDict
+from torch.utils.data import DataLoader
+from torch_geometric.transforms import Compose
+
+from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
+from data.dataset import SetCoverDataset, collate_fn_ip
+from data.utils import args_set_bool
+from models.hetero_gnn import TripartiteHeteroGNN
+from trainer import Trainer
+
+
+def args_parser():
+    parser = argparse.ArgumentParser(description='hyper params for training graph dataset')
+    # admin
+    parser.add_argument('--datapath', type=str, required=True)
+    parser.add_argument('--wandbproject', type=str, default='default')
+    parser.add_argument('--wandbname', type=str, default='')
+    parser.add_argument('--use_wandb', type=str, default='false')
+    parser.add_argument('--model_path', required=True)
+
+    # ipm processing
+    parser.add_argument('--ipm_restarts', type=int, default=1)
+    parser.add_argument('--ipm_steps', type=int, default=8)
+    parser.add_argument('--normalize_dataset', type=str, default='false')
+
+    # training dynamics
+    parser.add_argument('--runs', type=int, default=1)
+    parser.add_argument('--batchsize', type=int, default=16)
+    parser.add_argument('--dropout', type=float, default=0.)  # must
+    parser.add_argument('--use_norm', type=str, default='true')  # must
+    parser.add_argument('--use_res', type=str, default='false')  # does not help
+
+    # model related
+    parser.add_argument('--lappe', type=int, default=5)
+    parser.add_argument('--hidden', type=int, default=128)
+    parser.add_argument('--num_conv_layers', type=int, default=8)
+    parser.add_argument('--num_pred_layers', type=int, default=2)
+    parser.add_argument('--num_mlp_layers', type=int, default=2, help='mlp layers within GENConv')
+    parser.add_argument('--use_bipartite', type=str, default='false')
+    parser.add_argument('--share_conv_weight', type=str, default='false')
+    parser.add_argument('--share_lin_weight', type=str, default='true')
+    parser.add_argument('--conv_sequence', type=str, default='parallel')
+
+    return parser.parse_args()
+
+
+if __name__ == '__main__':
+    args = args_parser()
+    args = args_set_bool(vars(args))
+    args = ConfigDict(args)
+
+    # Be careful when generating instances
+    using_ineq_instance = os.path.split(args.datapath)[-1].startswith('ineq')
+
+    wandb.init(project=args.wandbproject,
+               name=args.wandbname if args.wandbname else None,
+               mode="online" if args.use_wandb else "disabled",
+               config=vars(args),
+               entity="chendiqian")  # use your own entity
+
+    dataset = SetCoverDataset(args.datapath,
+                              extra_path=f'{args.ipm_restarts}restarts_{args.lappe}lap_{args.ipm_steps}steps',
+                              using_ineq=using_ineq_instance,
+                              normalize=args.normalize_dataset,
+                              rand_starts=args.ipm_restarts,
+                              pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
+                                                     SubSample(args.ipm_steps)]))
+
+    test_loader = DataLoader(dataset[int(len(dataset) * 0.9):],
+                            batch_size=args.batchsize,
+                            shuffle=False,
+                            num_workers=4,
+                            pin_memory=True,
+                            collate_fn=collate_fn_ip)
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+    # test_losses = []
+    test_objgap_mean = []
+    test_consgap_mean = []
+
+    if args.use_bipartite:
+        raise NotImplementedError
+    else:
+        model = TripartiteHeteroGNN(in_shape=2,
+                                    pe_dim=args.lappe,
+                                    hid_dim=args.hidden,
+                                    num_conv_layers=args.num_conv_layers,
+                                    num_pred_layers=args.num_pred_layers,
+                                    num_mlp_layers=args.num_mlp_layers,
+                                    dropout=args.dropout,
+                                    share_conv_weight=args.share_conv_weight,
+                                    share_lin_weight=args.share_lin_weight,
+                                    use_norm=args.use_norm,
+                                    use_res=args.use_res,
+                                    conv_sequence=args.conv_sequence).to(device)
+
+    trainer = Trainer(device,
+                      'primal',
+                      'l2',
+                      dataset.mean, dataset.std,
+                      1,
+                      min(args.ipm_steps, args.num_conv_layers),
+                      1.,
+                      loss_weight=None,
+                      using_ineq=using_ineq_instance)
+
+    for run in range(args.runs):
+        model.load_state_dict(torch.load(os.path.join(args.model_path, f'run{run}', 'best_model.pt'), map_location=device))
+        model.eval()
+        with torch.no_grad():
+            # test_loss = trainer.eval(test_loader, model, None)
+            test_gaps = trainer.obj_metric(test_loader, model)
+            test_cons_gap = trainer.constraint_metric(test_loader, model)
+        # test_losses.append(test_loss)
+        test_objgap_mean.append(test_gaps[:, -1].mean().item())
+        test_consgap_mean.append(test_cons_gap[:, -1].mean().item())
+
+        wandb.log({'test_objgap': test_objgap_mean[-1]})
+        wandb.log({'test_consgap': test_consgap_mean[-1]})
+
+    logging.basicConfig(level=logging.INFO)
+    logging.info(f'test_objgap: {np.mean(test_objgap_mean):.4f} ± {np.std(test_objgap_mean):.4f},'
+                 f'test_consgap: {np.mean(test_consgap_mean):.4f} ± {np.std(test_consgap_mean):.4f}')
+
+    wandb.log({
+        'test_objgap_mean': np.mean(test_objgap_mean),
+        'test_objgap_std': np.std(test_objgap_mean),
+        'test_consgap_mean': np.mean(test_consgap_mean),
+        'test_consgap_std': np.std(test_consgap_mean),
+    })
