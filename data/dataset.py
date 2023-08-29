@@ -11,6 +11,7 @@ from torch_sparse import SparseTensor
 
 from scipy_solver.linprog import linprog
 from solver import ipm_overleaf
+from tqdm import tqdm
 
 
 def collate_fn_ip(graphs: List[Data]):
@@ -31,8 +32,9 @@ class SetCoverDataset(InMemoryDataset):
         root: str,
         extra_path: str,
         using_ineq: bool,
-        normalize: bool,
-        rand_starts: int = 10,
+        upper_bound: Optional = None,
+        normalize: bool = False,
+        rand_starts: int = 1,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
@@ -40,6 +42,7 @@ class SetCoverDataset(InMemoryDataset):
         self.rand_starts = rand_starts
         self.using_ineq = using_ineq
         self.extra_path = extra_path
+        self.upper_bound = upper_bound
         super().__init__(root, transform, pre_transform, pre_filter)
         path = osp.join(self.processed_dir, 'data.pt')
         self.data, self.slices = torch.load(path)
@@ -78,7 +81,7 @@ class SetCoverDataset(InMemoryDataset):
             with gzip.open(os.path.join(self.raw_dir, f"instance_{i}.pkl.gz"), "rb") as file:
                 ip_pkgs = pickle.load(file)
 
-            for ip_idx in range(len(ip_pkgs)):
+            for ip_idx in tqdm(range(len(ip_pkgs))):
                 (A, b, c) = ip_pkgs[ip_idx]
                 sp_a = SparseTensor.from_dense(A, has_value=True)
 
@@ -105,16 +108,18 @@ class SetCoverDataset(InMemoryDataset):
                     A_ub = None
                     b_ub = None
 
-                for _ in range(self.rand_starts):
-                    sol = ipm_overleaf(c.numpy(), A_ub, b_ub, A_eq, b_eq, None, max_iter=1000, lin_solver='scipy_cg')
-                    x = np.stack(sol['xs'], axis=1)  # primal
+                bounds = (0, self.upper_bound)
 
-                    # sol = linprog(c.numpy(),
-                    #               A_ub=A_ub,
-                    #               b_ub=b_ub,
-                    #               A_eq=A_eq, b_eq=b_eq, bounds=None,
-                    #               method='interior-point', callback=lambda res: res.x)
-                    # x = np.stack(sol.intermediate, axis=1)
+                for _ in range(self.rand_starts):
+                    # sol = ipm_overleaf(c.numpy(), A_ub, b_ub, A_eq, b_eq, None, max_iter=1000, lin_solver='scipy_cg')
+                    # x = np.stack(sol['xs'], axis=1)  # primal
+
+                    sol = linprog(c.numpy(),
+                                  A_ub=A_ub,
+                                  b_ub=b_ub,
+                                  A_eq=A_eq, b_eq=b_eq, bounds=bounds,
+                                  method='interior-point', callback=lambda res: res.x)
+                    x = np.stack(sol.intermediate, axis=1)
 
                     gt_primals = torch.from_numpy(x).to(torch.float)
                     # gt_duals = torch.from_numpy(l).to(torch.float)

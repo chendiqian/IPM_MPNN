@@ -31,6 +31,7 @@ def args_parser():
     parser.add_argument('--ipm_steps', type=int, default=8)
     parser.add_argument('--ipm_alpha', type=float, default=0.9)
     parser.add_argument('--normalize_dataset', type=str, default='false')  # does not help
+    parser.add_argument('--upper', type=float, default=None)
 
     # training dynamics
     parser.add_argument('--runs', type=int, default=1)
@@ -87,8 +88,12 @@ if __name__ == '__main__':
                entity="chendiqian")  # use your own entity
 
     dataset = SetCoverDataset(args.datapath,
-                              extra_path=f'{args.ipm_restarts}restarts_{args.lappe}lap_{args.ipm_steps}steps',
+                              extra_path=f'{args.ipm_restarts}restarts_'
+                                         f'{args.lappe}lap_'
+                                         f'{args.ipm_steps}steps'
+                                         f'{"_upper_" + str(args.upper) if args.upper is not None else ""}',
                               using_ineq=using_ineq_instance,
+                              upper_bound=args.upper,
                               normalize=args.normalize_dataset,
                               rand_starts=args.ipm_restarts,
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
