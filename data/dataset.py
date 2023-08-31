@@ -120,6 +120,7 @@ class SetCoverDataset(InMemoryDataset):
                                   A_eq=A_eq, b_eq=b_eq, bounds=bounds,
                                   method='interior-point', callback=lambda res: res.x)
                     x = np.stack(sol.intermediate, axis=1)
+                    assert not np.isnan(sol['fun'])
 
                     gt_primals = torch.from_numpy(x).to(torch.float)
                     # gt_duals = torch.from_numpy(l).to(torch.float)
