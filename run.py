@@ -172,7 +172,7 @@ if __name__ == '__main__':
             train_loss = trainer.train(train_loader, model, optimizer)
 
             with torch.no_grad():
-                val_loss = trainer.eval(val_loader, model, scheduler)
+                # val_loss = trainer.eval(val_loader, model, scheduler)
                 train_gaps = trainer.obj_metric(train_loader, model)
                 val_gaps = trainer.obj_metric(val_loader, model)
 
@@ -181,6 +181,10 @@ if __name__ == '__main__':
 
                 # metric to cache the best model
                 cur_mean_gap = val_gaps[:, -1].mean().item()
+
+                if scheduler is not None:
+                    scheduler.step(cur_mean_gap)
+
                 if trainer.best_val_objgap > cur_mean_gap:
                     trainer.patience = 0
                     trainer.best_val_objgap = cur_mean_gap
@@ -192,9 +196,11 @@ if __name__ == '__main__':
             if trainer.patience > args.patience:
                 break
 
-            pbar.set_postfix({'train_loss': train_loss, 'val_loss': val_loss, 'lr': scheduler.optimizer.param_groups[0]["lr"]})
+            pbar.set_postfix({'train_loss': train_loss,
+                              # 'val_loss': val_loss,
+                              'lr': scheduler.optimizer.param_groups[0]["lr"]})
             log_dict = {'train_loss': train_loss,
-                       'val_loss': val_loss,
+                       # 'val_loss': val_loss,
                        'lr': scheduler.optimizer.param_groups[0]["lr"]}
             for gnn_l in range(train_gaps.shape[1]):
                 log_dict[f'train_obj_gap_l{gnn_l}_mean'] = train_gaps[:, gnn_l].mean()
