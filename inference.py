@@ -29,6 +29,7 @@ def args_parser():
     parser.add_argument('--ipm_restarts', type=int, default=1)
     parser.add_argument('--ipm_steps', type=int, default=8)
     parser.add_argument('--normalize_dataset', type=str, default='false')
+    parser.add_argument('--upper', type=float, default=None)
 
     # training dynamics
     parser.add_argument('--runs', type=int, default=1)
@@ -55,6 +56,7 @@ if __name__ == '__main__':
     args = args_parser()
     args = args_set_bool(vars(args))
     args = ConfigDict(args)
+    logging.basicConfig(level=logging.INFO)
 
     # Be careful when generating instances
     using_ineq_instance = os.path.split(args.datapath)[-1].startswith('ineq')
@@ -66,8 +68,12 @@ if __name__ == '__main__':
                entity="chendiqian")  # use your own entity
 
     dataset = SetCoverDataset(args.datapath,
-                              extra_path=f'{args.ipm_restarts}restarts_{args.lappe}lap_{args.ipm_steps}steps',
+                              extra_path=f'{args.ipm_restarts}restarts_'
+                                         f'{args.lappe}lap_'
+                                         f'{args.ipm_steps}steps'
+                                         f'{"_upper_" + str(args.upper) if args.upper is not None else ""}',
                               using_ineq=using_ineq_instance,
+                              upper_bound=args.upper,
                               normalize=args.normalize_dataset,
                               rand_starts=args.ipm_restarts,
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
@@ -125,10 +131,12 @@ if __name__ == '__main__':
 
         wandb.log({'test_objgap': test_objgap_mean[-1]})
         wandb.log({'test_consgap': test_consgap_mean[-1]})
+        logging.info(
+            f'test_objgap: {test_objgap_mean[-1]},'
+            f'test_consgap: {test_consgap_mean[-1]}')
 
-    logging.basicConfig(level=logging.INFO)
-    logging.info(f'test_objgap: {np.mean(test_objgap_mean):.4f} ± {np.std(test_objgap_mean):.4f},'
-                 f'test_consgap: {np.mean(test_consgap_mean):.4f} ± {np.std(test_consgap_mean):.4f}')
+    logging.info(f'test_objgap_stats: {np.mean(test_objgap_mean):.4f} ± {np.std(test_objgap_mean):.4f},'
+                 f'test_consgap_stats: {np.mean(test_consgap_mean):.4f} ± {np.std(test_consgap_mean):.4f}')
 
     wandb.log({
         'test_objgap_mean': np.mean(test_objgap_mean),
