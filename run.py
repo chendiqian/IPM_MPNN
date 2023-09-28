@@ -12,9 +12,9 @@ from tqdm import tqdm
 import wandb
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
-from data.dataset import SetCoverDataset, collate_fn_ip
-from data.utils import args_set_bool
-from models.hetero_gnn import TripartiteHeteroGNN, BipartiteHeteroGNN
+from data.dataset import SetCoverDataset
+from data.utils import args_set_bool, collate_fn_ip
+from models.hetero_gnn import TripartiteHeteroGNN
 from trainer import Trainer
 
 
@@ -102,20 +102,17 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)],
                               batch_size=args.batchsize,
                               shuffle=True,
-                              num_workers=4,
-                              pin_memory=True,
+                              num_workers=1,
                               collate_fn=collate_fn_ip)
     val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)],
                             batch_size=args.batchsize,
                             shuffle=False,
-                            num_workers=4,
-                            pin_memory=True,
+                            num_workers=1,
                             collate_fn=collate_fn_ip)
     test_loader = DataLoader(dataset[int(len(dataset) * 0.9):],
                             batch_size=args.batchsize,
                             shuffle=False,
-                            num_workers=4,
-                            pin_memory=True,
+                            num_workers=1,
                             collate_fn=collate_fn_ip)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
