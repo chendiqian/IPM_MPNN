@@ -10,8 +10,8 @@ from torch.utils.data import DataLoader
 from torch_geometric.transforms import Compose
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
-from data.dataset import SetCoverDataset, collate_fn_ip
-from data.utils import args_set_bool
+from data.dataset import SetCoverDataset
+from data.utils import args_set_bool, collate_fn_ip
 from models.hetero_gnn import TripartiteHeteroGNN
 from trainer import Trainer
 
@@ -46,8 +46,8 @@ def args_parser():
     parser.add_argument('--num_mlp_layers', type=int, default=2, help='mlp layers within GENConv')
     parser.add_argument('--use_bipartite', type=str, default='false')
     parser.add_argument('--share_conv_weight', type=str, default='false')
-    parser.add_argument('--share_lin_weight', type=str, default='true')
-    parser.add_argument('--conv_sequence', type=str, default='parallel')
+    parser.add_argument('--share_lin_weight', type=str, default='false')
+    parser.add_argument('--conv_sequence', type=str, default='cov')
 
     return parser.parse_args()
 
@@ -79,11 +79,10 @@ if __name__ == '__main__':
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(args.ipm_steps)]))
 
-    test_loader = DataLoader(dataset[int(len(dataset) * 0.9):],
+    test_loader = DataLoader(dataset,
                             batch_size=args.batchsize,
                             shuffle=False,
-                            num_workers=4,
-                            pin_memory=True,
+                            num_workers=1,
                             collate_fn=collate_fn_ip)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -135,8 +134,8 @@ if __name__ == '__main__':
             f'test_objgap: {test_objgap_mean[-1]},'
             f'test_consgap: {test_consgap_mean[-1]}')
 
-    logging.info(f'test_objgap_stats: {np.mean(test_objgap_mean):.4f} ± {np.std(test_objgap_mean):.4f},'
-                 f'test_consgap_stats: {np.mean(test_consgap_mean):.4f} ± {np.std(test_consgap_mean):.4f}')
+    logging.info(f'test_objgap_stats: {np.mean(test_objgap_mean) * 100:.5f} ± {np.std(test_objgap_mean) * 100:.5f},'
+                 f'test_consgap_stats: {np.mean(test_consgap_mean):.5f} ± {np.std(test_consgap_mean):.5f}')
 
     wandb.log({
         'test_objgap_mean': np.mean(test_objgap_mean),
