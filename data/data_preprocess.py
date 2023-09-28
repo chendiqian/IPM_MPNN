@@ -43,7 +43,13 @@ class SubSample:
 
     def __call__(self, data):
         len_seq = data.gt_primals.shape[1]
-        if self.k == len_seq:
+        if self.k == 1:
+            data.gt_primals = data.gt_primals[:, -1:]
+            if hasattr(data, 'gt_duals'):
+                data.gt_duals = data.gt_duals[:, -1:]
+            if hasattr(data, 'gt_slacks'):
+                data.gt_slacks = data.gt_slacks[:, -1:]
+        elif self.k == len_seq:
             return data
         elif self.k > len_seq:
             data.gt_primals = torch.cat([data.gt_primals,
