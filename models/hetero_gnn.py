@@ -1,7 +1,8 @@
 import torch
 import torch.nn.functional as F
 
-from models.genconv import GENConv, MLP
+from models.genconv import GENConv
+from models.utils import MLP
 from models.hetero_conv import HeteroConv
 
 
@@ -50,6 +51,7 @@ class TripartiteHeteroGNN(torch.nn.Module):
                  share_lin_weight,
                  use_norm,
                  use_res,
+                 in_place=True,
                  conv_sequence='parallel'):
         super().__init__()
 
@@ -82,7 +84,8 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                          learn_msg_scale=use_norm,
                                                          norm='batch' if use_norm else None,
                                                          bias=True,
-                                                         edge_dim=1), c2v),
+                                                         edge_dim=1,
+                                                         in_place=in_place), c2v),
                         ('vals', 'to', 'cons'): (GENConv(in_channels=2 * hid_dim,
                                                          out_channels=hid_dim,
                                                          num_layers=num_mlp_layers,
@@ -91,7 +94,8 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                          learn_msg_scale=use_norm,
                                                          norm='batch' if use_norm else None,
                                                          bias=True,
-                                                         edge_dim=1), v2c),
+                                                         edge_dim=1,
+                                                         in_place=in_place), v2c),
                         ('vals', 'to', 'obj'): (GENConv(in_channels=2 * hid_dim,
                                                         out_channels=hid_dim,
                                                         num_layers=num_mlp_layers,
@@ -100,7 +104,8 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                         learn_msg_scale=use_norm,
                                                         norm='layer' if use_norm else None,
                                                         bias=True,
-                                                        edge_dim=1), v2o),
+                                                        edge_dim=1,
+                                                        in_place=in_place), v2o),
                         ('obj', 'to', 'vals'): (GENConv(in_channels=2 * hid_dim,
                                                         out_channels=hid_dim,
                                                         num_layers=num_mlp_layers,
@@ -109,7 +114,8 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                         learn_msg_scale=use_norm,
                                                         norm='batch' if use_norm else None,
                                                         bias=True,
-                                                        edge_dim=1), o2v),
+                                                        edge_dim=1,
+                                                        in_place=in_place), o2v),
                         ('cons', 'to', 'obj'): (GENConv(in_channels=2 * hid_dim,
                                                         out_channels=hid_dim,
                                                         num_layers=num_mlp_layers,
@@ -118,7 +124,8 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                         learn_msg_scale=use_norm,
                                                         norm='layer' if use_norm else None,
                                                         bias=True,
-                                                        edge_dim=1), c2o),
+                                                        edge_dim=1,
+                                                        in_place=in_place), c2o),
                         ('obj', 'to', 'cons'): (GENConv(in_channels=2 * hid_dim,
                                                         out_channels=hid_dim,
                                                         num_layers=num_mlp_layers,
@@ -127,7 +134,8 @@ class TripartiteHeteroGNN(torch.nn.Module):
                                                         learn_msg_scale=use_norm,
                                                         norm='batch' if use_norm else None,
                                                         bias=True,
-                                                        edge_dim=1), o2c),
+                                                        edge_dim=1,
+                                                        in_place=in_place), o2c),
                     },
                         aggr='cat'))
 
