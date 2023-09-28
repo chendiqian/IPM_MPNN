@@ -185,3 +185,26 @@ class Trainer:
             cons_gap.append(np.abs(self.get_constraint_violation(vals, data).detach().cpu().numpy()))
 
         return np.concatenate(cons_gap, axis=0)
+
+    @torch.no_grad()
+    def eval_baseline(self, dataloader, model, T):
+        model.eval()
+
+        obj_gaps = []
+        constraint_gaps = []
+        for i, (_, ori_batch) in enumerate(dataloader):
+            ori_batch = ori_batch.to(self.device)
+            val_con_repeats = model(torch.ones(ori_batch.num_graphs, dtype=torch.float, device=self.device) * T,
+                                    ori_batch)
+
+            vals, cons = torch.split(val_con_repeats,
+                                     torch.hstack([ori_batch.num_val_nodes.sum(),
+                                                   ori_batch.num_con_nodes.sum()]).tolist(), dim=0)
+
+            obj_gaps.append(self.get_obj_metric(ori_batch, vals[:, None], True).abs().cpu().numpy())
+            constraint_gaps.append(self.get_constraint_violation(vals[:, None], ori_batch).abs().cpu().numpy())
+
+        obj_gaps = np.concatenate(obj_gaps, axis=0).squeeze()
+        constraint_gaps = np.concatenate(constraint_gaps, axis=0).squeeze()
+
+        return obj_gaps, constraint_gaps
