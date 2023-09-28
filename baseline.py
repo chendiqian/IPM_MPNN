@@ -94,7 +94,7 @@ if __name__ == '__main__':
                               normalize=args.normalize_dataset,
                               rand_starts=args.ipm_restarts,
                               pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
-                                                     SubSample(args.ipm_steps)]))[:20]
+                                                     SubSample(args.ipm_steps)]))
 
     train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)],
                               batch_size=args.batchsize,
