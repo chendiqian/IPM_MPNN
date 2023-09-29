@@ -7,6 +7,7 @@ from models.utils import MLP
 
 class TimeDependentTripartiteHeteroGNN(TripartiteHeteroGNN):
     def __init__(self,
+                 conv,
                  in_shape,
                  pe_dim,
                  hid_dim,
@@ -20,19 +21,21 @@ class TimeDependentTripartiteHeteroGNN(TripartiteHeteroGNN):
                  conv_sequence='cov'):
         # torch.manual_seed(42)
         # torch.cuda.manual_seed(42)
-        super().__init__(in_shape,
-                 pe_dim,
-                 hid_dim,
-                 num_conv_layers,
-                 num_pred_layers,
-                 num_mlp_layers,
-                 dropout,
-                 share_conv_weight,
-                 True,
-                 use_norm,
-                 use_res,
-                 False,
-                 conv_sequence)
+        super().__init__(
+            conv,
+            in_shape,
+            pe_dim,
+            hid_dim,
+            num_conv_layers,
+            num_pred_layers,
+            num_mlp_layers,
+            dropout,
+            share_conv_weight,
+            True,
+            use_norm,
+            use_res,
+            False,
+            conv_sequence)
         self.time_encoder = MLP([1, hid_dim, hid_dim])
         # self.encoder = torch.nn.ModuleDict({'vals': MLP([in_shape, hid_dim, hid_dim], norm='batch'),
         #                                     'cons': MLP([in_shape, hid_dim, hid_dim], norm='batch'),

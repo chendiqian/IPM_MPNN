@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 
 from models.genconv import GENConv
+from models.gcnconv import GCNConv
 from models.utils import MLP
 from models.hetero_conv import HeteroConv
 
@@ -38,8 +39,40 @@ def strseq2rank(conv_sequence):
     return c2v, v2c, v2o, o2v, c2o, o2c
 
 
+def get_conv_layer(conv: str,
+             hid_dim: int,
+             num_mlp_layers: int,
+             use_norm: bool,
+             in_place: bool):
+    if conv.lower() == 'genconv':
+        def get_conv():
+            return GENConv(in_channels=2 * hid_dim,
+                    out_channels=hid_dim,
+                    num_layers=num_mlp_layers,
+                    aggr='softmax',
+                    msg_norm=use_norm,
+                    learn_msg_scale=use_norm,
+                    norm='batch' if use_norm else None,
+                    bias=True,
+                    edge_dim=1,
+                    in_place=in_place)
+    elif conv.lower() == 'gcnconv':
+        def get_conv():
+            return GCNConv(in_dim=2 * hid_dim,
+                           edge_dim=1,
+                           hid_dim=hid_dim,
+                           num_mlp_layers=num_mlp_layers,
+                           norm='batch' if use_norm else None,
+                           in_place=in_place)
+    else:
+        raise NotImplementedError
+
+    return get_conv
+
+
 class TripartiteHeteroGNN(torch.nn.Module):
     def __init__(self,
+                 conv,
                  in_shape,
                  pe_dim,
                  hid_dim,
@@ -71,73 +104,19 @@ class TripartiteHeteroGNN(torch.nn.Module):
             'obj': MLP([pe_dim, hid_dim, hid_dim])})
 
         c2v, v2c, v2o, o2v, c2o, o2c = strseq2rank(conv_sequence)
+        get_conv = get_conv_layer(conv, hid_dim, num_mlp_layers, use_norm, in_place)
         self.gcns = torch.nn.ModuleList()
         for layer in range(num_conv_layers):
             if layer == 0 or not share_conv_weight:
                 self.gcns.append(
                     HeteroConv({
-                        ('cons', 'to', 'vals'): (GENConv(in_channels=2 * hid_dim,
-                                                         out_channels=hid_dim,
-                                                         num_layers=num_mlp_layers,
-                                                         aggr='softmax',
-                                                         msg_norm=use_norm,
-                                                         learn_msg_scale=use_norm,
-                                                         norm='batch' if use_norm else None,
-                                                         bias=True,
-                                                         edge_dim=1,
-                                                         in_place=in_place), c2v),
-                        ('vals', 'to', 'cons'): (GENConv(in_channels=2 * hid_dim,
-                                                         out_channels=hid_dim,
-                                                         num_layers=num_mlp_layers,
-                                                         aggr='softmax',
-                                                         msg_norm=use_norm,
-                                                         learn_msg_scale=use_norm,
-                                                         norm='batch' if use_norm else None,
-                                                         bias=True,
-                                                         edge_dim=1,
-                                                         in_place=in_place), v2c),
-                        ('vals', 'to', 'obj'): (GENConv(in_channels=2 * hid_dim,
-                                                        out_channels=hid_dim,
-                                                        num_layers=num_mlp_layers,
-                                                        aggr='softmax',
-                                                        msg_norm=use_norm,
-                                                        learn_msg_scale=use_norm,
-                                                        norm='layer' if use_norm else None,
-                                                        bias=True,
-                                                        edge_dim=1,
-                                                        in_place=in_place), v2o),
-                        ('obj', 'to', 'vals'): (GENConv(in_channels=2 * hid_dim,
-                                                        out_channels=hid_dim,
-                                                        num_layers=num_mlp_layers,
-                                                        aggr='softmax',
-                                                        msg_norm=use_norm,
-                                                        learn_msg_scale=use_norm,
-                                                        norm='batch' if use_norm else None,
-                                                        bias=True,
-                                                        edge_dim=1,
-                                                        in_place=in_place), o2v),
-                        ('cons', 'to', 'obj'): (GENConv(in_channels=2 * hid_dim,
-                                                        out_channels=hid_dim,
-                                                        num_layers=num_mlp_layers,
-                                                        aggr='softmax',
-                                                        msg_norm=use_norm,
-                                                        learn_msg_scale=use_norm,
-                                                        norm='layer' if use_norm else None,
-                                                        bias=True,
-                                                        edge_dim=1,
-                                                        in_place=in_place), c2o),
-                        ('obj', 'to', 'cons'): (GENConv(in_channels=2 * hid_dim,
-                                                        out_channels=hid_dim,
-                                                        num_layers=num_mlp_layers,
-                                                        aggr='softmax',
-                                                        msg_norm=use_norm,
-                                                        learn_msg_scale=use_norm,
-                                                        norm='batch' if use_norm else None,
-                                                        bias=True,
-                                                        edge_dim=1,
-                                                        in_place=in_place), o2c),
-                    },
-                        aggr='cat'))
+                        ('cons', 'to', 'vals'): (get_conv(), c2v),
+                        ('vals', 'to', 'cons'): (get_conv(), v2c),
+                        ('vals', 'to', 'obj'): (get_conv(), v2o),
+                        ('obj', 'to', 'vals'): (get_conv(), o2v),
+                        ('cons', 'to', 'obj'): (get_conv(), c2o),
+                        ('obj', 'to', 'cons'): (get_conv(), o2c),
+                    }, aggr='cat'))
 
         if share_lin_weight:
             self.pred_vals = MLP([2 * hid_dim] + [hid_dim] * (num_pred_layers - 1) + [1])

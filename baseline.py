@@ -50,6 +50,7 @@ def args_parser():
     parser.add_argument('--repeats', type=int, default=8)  # repeat of t sampled
 
     # model related
+    parser.add_argument('--conv', type=str, default='genconv')
     parser.add_argument('--lappe', type=int, default=5)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--num_conv_layers', type=int, default=8)
@@ -120,7 +121,8 @@ if __name__ == '__main__':
 
     for run in range(args.runs):
         os.mkdir(os.path.join(log_folder_name, f'run{run}'))
-        model = TimeDependentTripartiteHeteroGNN(in_shape=2,
+        model = TimeDependentTripartiteHeteroGNN(conv=args.conv,
+                                                 in_shape=2,
                                                  pe_dim=args.lappe,
                                                  hid_dim=args.hidden,
                                                  num_conv_layers=args.num_conv_layers,

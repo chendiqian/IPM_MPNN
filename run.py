@@ -46,6 +46,7 @@ def args_parser():
     parser.add_argument('--use_res', type=str, default='false')  # does not help
 
     # model related
+    parser.add_argument('--conv', type=str, default='genconv')
     parser.add_argument('--lappe', type=int, default=5)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--num_conv_layers', type=int, default=8)
@@ -134,7 +135,8 @@ if __name__ == '__main__':
             #                            num_layers=args.ipm_steps,
             #                            use_norm=args.use_norm).to(device)
         else:
-            model = TripartiteHeteroGNN(in_shape=2,
+            model = TripartiteHeteroGNN(conv=args.conv,
+                                        in_shape=2,
                                         pe_dim=args.lappe,
                                         hid_dim=args.hidden,
                                         num_conv_layers=args.num_conv_layers,
