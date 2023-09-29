@@ -94,14 +94,19 @@ class TripartiteHeteroGNN(torch.nn.Module):
         self.num_layers = num_conv_layers
         self.use_res = use_res
 
-        self.encoder = torch.nn.ModuleDict({'vals': MLP([in_shape, hid_dim, hid_dim], norm='batch'),
-                                            'cons': MLP([in_shape, hid_dim, hid_dim], norm='batch'),
-                                            'obj': MLP([in_shape, hid_dim, hid_dim], norm='batch')})
+        if pe_dim > 0:
+            self.pe_encoder = torch.nn.ModuleDict({
+                'vals': MLP([pe_dim, hid_dim, hid_dim]),
+                'cons': MLP([pe_dim, hid_dim, hid_dim]),
+                'obj': MLP([pe_dim, hid_dim, hid_dim])})
+            in_emb_dim = hid_dim
+        else:
+            self.pe_encoder = None
+            in_emb_dim = 2 * hid_dim
 
-        self.pe_encoder = torch.nn.ModuleDict({
-            'vals': MLP([pe_dim, hid_dim, hid_dim]),
-            'cons': MLP([pe_dim, hid_dim, hid_dim]),
-            'obj': MLP([pe_dim, hid_dim, hid_dim])})
+        self.encoder = torch.nn.ModuleDict({'vals': MLP([in_shape, hid_dim, in_emb_dim], norm='batch'),
+                                            'cons': MLP([in_shape, hid_dim, in_emb_dim], norm='batch'),
+                                            'obj': MLP([in_shape, hid_dim, in_emb_dim], norm='batch')})
 
         c2v, v2c, v2o, o2v, c2o, o2c = strseq2rank(conv_sequence)
         get_conv = get_conv_layer(conv, hid_dim, num_mlp_layers, use_norm, in_place)
@@ -131,9 +136,12 @@ class TripartiteHeteroGNN(torch.nn.Module):
     def forward(self, data):
         x_dict, edge_index_dict, edge_attr_dict = data.x_dict, data.edge_index_dict, data.edge_attr_dict
         for k in ['cons', 'vals', 'obj']:
-            x_dict[k] = torch.cat([self.encoder[k](x_dict[k]),
-                                   0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
-                                          self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))], dim=1)
+            x_emb = self.encoder[k](x_dict[k])
+            if self.pe_encoder is not None and hasattr(data[k], 'laplacian_eigenvector_pe'):
+                pe_emb = 0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
+                                self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))
+                x_emb = torch.cat([x_emb, pe_emb], dim=1)
+            x_dict[k] = x_emb
 
         hiddens = []
         for i in range(self.num_layers):

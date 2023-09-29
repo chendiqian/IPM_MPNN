@@ -36,19 +36,22 @@ class TimeDependentTripartiteHeteroGNN(TripartiteHeteroGNN):
             use_res,
             False,
             conv_sequence)
-        self.time_encoder = MLP([1, hid_dim, hid_dim])
-        # self.encoder = torch.nn.ModuleDict({'vals': MLP([in_shape, hid_dim, hid_dim], norm='batch'),
-        #                                     'cons': MLP([in_shape, hid_dim, hid_dim], norm='batch'),
-        #                                     'obj': MLP([in_shape, hid_dim, hid_dim], norm='batch')})
+        in_emb_dim = hid_dim if pe_dim > 0 else 2 * hid_dim
+        self.time_encoder = MLP([1, hid_dim, in_emb_dim])
+        # self.encoder = torch.nn.ModuleDict({'vals': MLP([in_shape, hid_dim, in_emb_dim], norm='batch'),
+        #                                     'cons': MLP([in_shape, hid_dim, in_emb_dim], norm='batch'),
+        #                                     'obj': MLP([in_shape, hid_dim, in_emb_dim], norm='batch')})
 
     def forward(self, t, data):
         # t: shape (N,)
         x_dict, edge_index_dict, edge_attr_dict = data.x_dict, data.edge_index_dict, data.edge_attr_dict
-        # return (self.encoder['obj'](x_dict['obj']) + self.time_encoder(t.reshape(-1, 1))).squeeze()
         for k in ['cons', 'vals', 'obj']:
-            x_dict[k] = torch.cat([self.encoder[k](x_dict[k]) + (self.time_encoder(t.reshape(-1, 1)) if k == 'obj' else 0.),
-                                   0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
-                                          self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))], dim=1)
+            x_emb = self.encoder[k](x_dict[k]) + (self.time_encoder(t.reshape(-1, 1)) if k == 'obj' else 0.)
+            if self.pe_encoder is not None and hasattr(data[k], 'laplacian_eigenvector_pe'):
+                pe_emb = 0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
+                                self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))
+                x_emb = torch.cat([x_emb, pe_emb], dim=1)
+            x_dict[k] = x_emb
 
         hiddens = []
         for i in range(self.num_layers):

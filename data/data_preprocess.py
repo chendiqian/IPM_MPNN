@@ -20,6 +20,8 @@ class HeteroAddLaplacianEigenvectorPE:
         self.attr_name = attr_name
 
     def __call__(self, data):
+        if self.k == 0:
+            return data
         data_homo = data.to_homogeneous()
         del data_homo.edge_weight
         lap = AddLaplacianEigenvectorPE(k=self.k, attr_name=self.attr_name)(data_homo).laplacian_eigenvector_pe
