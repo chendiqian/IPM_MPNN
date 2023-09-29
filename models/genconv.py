@@ -134,6 +134,7 @@ class GENConv(MessagePassing):
         if self.in_place:
             out = self.propagate(edge_index, x=x, edge_attr=edge_attr, size=size)
         else:
+            # todo: add softmax non in-place
             msg = x[0][edge_index[0]] if edge_attr is None else x[0][edge_index[0]] + edge_attr
             msg = torch.relu(msg) + self.eps
             out = scatter_sum(msg, edge_index[1], dim=0)
