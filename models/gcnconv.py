@@ -7,14 +7,14 @@ from torch_geometric.utils import degree
 
 
 class GCNConv(MessagePassing):
-    def __init__(self, in_dim, edge_dim, hid_dim, num_mlp_layers, in_place = True):
+    def __init__(self, in_dim, edge_dim, hid_dim, num_mlp_layers, norm, in_place = True):
         super(GCNConv, self).__init__(aggr='add')
 
         self.in_place = in_place
         self.lin_src = torch.nn.Linear(in_dim, hid_dim)
         self.lin_dst = torch.nn.Linear(in_dim, hid_dim)
         self.lin_edge = torch.nn.Linear(edge_dim, hid_dim)
-        self.mlp = MLP([hid_dim] * (num_mlp_layers + 1), norm='batch')
+        self.mlp = MLP([hid_dim] * (num_mlp_layers + 1), norm=norm)
 
     def forward(self, x, edge_index, edge_attr):
         x = (self.lin_src(x[0]), x[1])
