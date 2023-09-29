@@ -122,8 +122,7 @@ if __name__ == '__main__':
         model.eval()
         with torch.no_grad():
             # test_loss = trainer.eval(test_loader, model, None)
-            test_gaps = trainer.obj_metric(test_loader, model)
-            test_cons_gap = trainer.constraint_metric(test_loader, model)
+            test_gaps, test_cons_gap = trainer.eval_metrics(test_loader, model)
         # test_losses.append(test_loss)
         test_objgap_mean.append(test_gaps[:, -1].mean().item())
         test_consgap_mean.append(test_cons_gap[:, -1].mean().item())

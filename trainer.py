@@ -187,6 +187,30 @@ class Trainer:
         return np.concatenate(cons_gap, axis=0)
 
     @torch.no_grad()
+    def eval_metrics(self, dataloader, model):
+        """
+        both obj and constraint gap
+
+        :param dataloader:
+        :param model:
+        :return:
+        """
+        model.eval()
+
+        cons_gap = []
+        obj_gap = []
+        for i, data in enumerate(dataloader):
+            data = data.to(self.device)
+            vals, _ = model(data)
+            cons_gap.append(np.abs(self.get_constraint_violation(vals, data).detach().cpu().numpy()))
+            obj_gap.append(np.abs(self.get_obj_metric(data, vals, hard_non_negative=True).detach().cpu().numpy()))
+
+        obj_gap = np.concatenate(obj_gap, axis=0)
+        cons_gap = np.concatenate(cons_gap, axis=0)
+        return obj_gap, cons_gap
+
+
+    @torch.no_grad()
     def eval_baseline(self, dataloader, model, T):
         model.eval()
 
