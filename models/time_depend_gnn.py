@@ -2,7 +2,7 @@ from models.hetero_gnn import TripartiteHeteroGNN
 import torch
 import torch.nn.functional as F
 
-from models.genconv import MLP
+from models.utils import MLP
 
 
 class TimeDependentTripartiteHeteroGNN(TripartiteHeteroGNN):
@@ -21,17 +21,18 @@ class TimeDependentTripartiteHeteroGNN(TripartiteHeteroGNN):
         # torch.manual_seed(42)
         # torch.cuda.manual_seed(42)
         super().__init__(in_shape,
-                         pe_dim,
-                         hid_dim,
-                         num_conv_layers,
-                         num_pred_layers,
-                         num_mlp_layers,
-                         dropout,
-                         share_conv_weight,
-                         True,
-                         use_norm,
-                         use_res,
-                         conv_sequence)
+                 pe_dim,
+                 hid_dim,
+                 num_conv_layers,
+                 num_pred_layers,
+                 num_mlp_layers,
+                 dropout,
+                 share_conv_weight,
+                 True,
+                 use_norm,
+                 use_res,
+                 False,
+                 conv_sequence)
         self.time_encoder = MLP([1, hid_dim, hid_dim])
         # self.encoder = torch.nn.ModuleDict({'vals': MLP([in_shape, hid_dim, hid_dim], norm='batch'),
         #                                     'cons': MLP([in_shape, hid_dim, hid_dim], norm='batch'),
@@ -42,10 +43,9 @@ class TimeDependentTripartiteHeteroGNN(TripartiteHeteroGNN):
         x_dict, edge_index_dict, edge_attr_dict = data.x_dict, data.edge_index_dict, data.edge_attr_dict
         # return (self.encoder['obj'](x_dict['obj']) + self.time_encoder(t.reshape(-1, 1))).squeeze()
         for k in ['cons', 'vals', 'obj']:
-            x_dict[k] = torch.cat(
-                [self.encoder[k](x_dict[k]) + (self.time_encoder(t.reshape(-1, 1)) if k == 'obj' else 0.),
-                 0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
-                        self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))], dim=1)
+            x_dict[k] = torch.cat([self.encoder[k](x_dict[k]) + (self.time_encoder(t.reshape(-1, 1)) if k == 'obj' else 0.),
+                                   0.5 * (self.pe_encoder[k](data[k].laplacian_eigenvector_pe) +
+                                          self.pe_encoder[k](-data[k].laplacian_eigenvector_pe))], dim=1)
 
         hiddens = []
         for i in range(self.num_layers):
@@ -65,12 +65,10 @@ class TimeDependentTripartiteHeteroGNN(TripartiteHeteroGNN):
 
         cons, vals = hiddens[-1]
 
-        vals = self.pred_vals(vals).squeeze()  # val * hidden -> #val
+        vals = self.pred_vals(vals).squeeze()  #val * hidden -> #val
         cons = self.pred_cons(cons).squeeze()
 
-        val_con_repeats = torch.cat([vals, cons], dim=0)
-        time_repeat = torch.repeat_interleave(t.repeat(2),
-                                              torch.hstack([data.num_val_nodes.repeat(data.repeats),
-                                                            data.num_con_nodes.repeat(data.repeats)]))
-        val_con_repeats = val_con_repeats * (1 - torch.exp(-time_repeat))
-        return val_con_repeats
+        val_con = torch.cat([vals, cons], dim=0)
+        val_con = val_con * (1 - torch.exp(-t))
+
+        return val_con
