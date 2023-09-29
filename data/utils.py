@@ -35,33 +35,13 @@ def barrier_function(x, t=1.e5):
     return torch.where(cond, (-1 / t) * torch.log(x), -t * x - 1 / t * math.log(1 / (t ** 2)) + 1 / t)
 
 
-def collate_fn_with_repeats(graphs: List[Data], repeats: int):
-    # [1, 1, 1, 2, 2, 2, 3, 3, 3]
-    num_graphs = len(graphs)
+def collate_fn_with_counts(graphs: List[Data]):
     original_batch = collate_fn_ip(graphs)
     num_val_nodes = torch.tensor([g['vals'].x.shape[0] for g in graphs])
     num_con_nodes = torch.tensor([g['cons'].x.shape[0] for g in graphs])
     original_batch.num_val_nodes = num_val_nodes
     original_batch.num_con_nodes = num_con_nodes
-    original_batch.repeats = 1
-
-    cumsum_vals = torch.cat([num_val_nodes.new_zeros(1, dtype=torch.long),
-                             torch.cumsum(torch.vstack([num_val_nodes, num_con_nodes]).sum(0), dim=0)], dim=0)
-    batch_val = torch.cat([torch.arange(n).repeat(repeats) + cumsum_vals[i] for i, n in enumerate(num_val_nodes)],
-                          dim=0)
-    cumsum_cons = torch.cumsum(torch.vstack([torch.hstack([num_val_nodes, torch.zeros(1, dtype=torch.long)]),
-                                             torch.hstack([torch.zeros(1, dtype=torch.long), num_con_nodes])]).sum(0),
-                               dim=0)
-    batch_con = torch.cat([torch.arange(n).repeat(repeats) + cumsum_cons[i] for i, n in enumerate(num_con_nodes)],
-                          dim=0)
-    graphs = [g for g in graphs for _ in range(repeats)]
-    batch = collate_fn_ip(graphs)
-    batch.num_val_nodes = num_val_nodes
-    batch.num_con_nodes = num_con_nodes
-    # batch.num_graphs = num_graphs
-    batch.repeats = repeats
-    batch.val_con_batch = torch.cat([batch_val, batch_con], dim=0)
-    return batch, original_batch
+    return original_batch
 
 
 def collate_fn_ip(graphs: List[Data]):

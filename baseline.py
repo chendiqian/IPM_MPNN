@@ -10,7 +10,6 @@ from functorch.experimental import replace_all_batch_norm_modules_
 from ml_collections import ConfigDict
 from torch import optim
 from torch.utils.data import DataLoader
-from torch_geometric.nn import global_add_pool
 from torch_geometric.transforms import Compose
 from torch_sparse import SparseTensor
 from tqdm import tqdm
@@ -18,7 +17,7 @@ from tqdm import tqdm
 from trainer import Trainer
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
 from data.dataset import SetCoverDataset
-from data.utils import args_set_bool, collate_fn_with_repeats
+from data.utils import args_set_bool, collate_fn_with_counts
 from models.time_depend_gnn import TimeDependentTripartiteHeteroGNN
 
 
@@ -100,17 +99,17 @@ if __name__ == '__main__':
                               batch_size=args.batchsize,
                               shuffle=True,
                               num_workers=1,
-                              collate_fn=partial(collate_fn_with_repeats, repeats=args.repeats))
+                              collate_fn=collate_fn_with_counts)
     val_loader = DataLoader(dataset[int(len(dataset) * 0.8):int(len(dataset) * 0.9)],
                             batch_size=args.batchsize,
                             shuffle=False,
                             num_workers=1,
-                            collate_fn=partial(collate_fn_with_repeats, repeats=args.repeats))
+                            collate_fn=collate_fn_with_counts)
     test_loader = DataLoader(dataset[int(len(dataset) * 0.9):],
                              batch_size=args.batchsize,
                              shuffle=False,
                              num_workers=1,
-                             collate_fn=partial(collate_fn_with_repeats, repeats=args.repeats))
+                             collate_fn=collate_fn_with_counts)
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -158,31 +157,29 @@ if __name__ == '__main__':
 
             train_losses = 0.
             num_graphs = 0
-            for i, (data, ori_batch) in enumerate(train_loader):
+            for i, data in enumerate(train_loader):
                 data = data.to(device)
-                time_var = torch.rand(data.num_graphs).to(device) * args.T
+                time_var = torch.rand(args.repeats).to(device) * args.T
 
-                def forward(t):
-                    val_con_repeats = model.forward(t, data)
-                    return global_add_pool(val_con_repeats, data.val_con_batch)
-
-                jac = torch.func.jacrev(forward, argnums=0, has_aux=False)(time_var)
-                jac = torch.split(jac, (data.num_val_nodes + data.num_con_nodes).tolist(), dim=0)
-                jac = torch.hstack([_jac[:, i * data.repeats: (i + 1) * data.repeats].t().reshape(-1) for i, _jac in enumerate(jac)])
+                forward = partial(model.forward, data=data)
+                jac = torch.func.jacrev(forward, argnums=0)
+                batch_jac = torch.vmap(jac, in_dims=0, out_dims=1)
+                jac = batch_jac(time_var)
 
                 def split(t):
-                    val_con_repeats = model.forward(t, data)
+                    batch_forward = torch.vmap(forward, in_dims=0, out_dims=1)
+                    val_con_repeats = batch_forward(t)
                     vals, cons = torch.split(val_con_repeats,
-                                             torch.hstack([data.num_val_nodes.sum() * data.repeats,
-                                                           data.num_con_nodes.sum() * data.repeats]).tolist(), dim=0)
+                                             torch.hstack([data.num_val_nodes.sum(),
+                                                           data.num_con_nodes.sum()]).tolist(), dim=0)
                     return vals, cons
 
                 x, u = split(time_var)
                 A = SparseTensor(row=data.A_row, col=data.A_col, value=data.A_val)
                 D = data.obj_const
                 b = data.rhs
-                uaxb = u[:, None] + A @ x[:, None] - b[:, None]
-                phi = torch.cat([-(D[:, None] + A.t() @ uaxb), uaxb - u[:, None]], dim=0).squeeze()
+                uaxb = torch.relu(u + A @ x - b[:, None])
+                phi = torch.cat([-(D[:, None] + A.t() @ uaxb), uaxb - u], dim=0)
 
                 loss = torch.nn.MSELoss()(jac, phi)
 

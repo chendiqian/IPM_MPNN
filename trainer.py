@@ -192,17 +192,17 @@ class Trainer:
 
         obj_gaps = []
         constraint_gaps = []
-        for i, (_, ori_batch) in enumerate(dataloader):
-            ori_batch = ori_batch.to(self.device)
-            val_con_repeats = model(torch.ones(ori_batch.num_graphs, dtype=torch.float, device=self.device) * T,
-                                    ori_batch)
+        for i, data in enumerate(dataloader):
+            data = data.to(self.device)
+            val_con_repeats = model(torch.ones(1, dtype=torch.float, device=self.device) * T,
+                                    data)
 
             vals, cons = torch.split(val_con_repeats,
-                                     torch.hstack([ori_batch.num_val_nodes.sum(),
-                                                   ori_batch.num_con_nodes.sum()]).tolist(), dim=0)
+                                     torch.hstack([data.num_val_nodes.sum(),
+                                                   data.num_con_nodes.sum()]).tolist(), dim=0)
 
-            obj_gaps.append(self.get_obj_metric(ori_batch, vals[:, None], True).abs().cpu().numpy())
-            constraint_gaps.append(self.get_constraint_violation(vals[:, None], ori_batch).abs().cpu().numpy())
+            obj_gaps.append(self.get_obj_metric(data, vals[:, None], True).abs().cpu().numpy())
+            constraint_gaps.append(self.get_constraint_violation(vals[:, None], data).abs().cpu().numpy())
 
         obj_gaps = np.concatenate(obj_gaps, axis=0).squeeze()
         constraint_gaps = np.concatenate(constraint_gaps, axis=0).squeeze()
