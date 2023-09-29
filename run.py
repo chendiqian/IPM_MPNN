@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
             with torch.no_grad():
                 # val_loss = trainer.eval(val_loader, model, scheduler)
-                train_gaps, train_constraint_gap = trainer.eval_metrics(train_loader, model)
+                # train_gaps, train_constraint_gap = trainer.eval_metrics(train_loader, model)
                 val_gaps, val_constraint_gap = trainer.eval_metrics(val_loader, model)
 
                 # metric to cache the best model
@@ -196,14 +196,14 @@ if __name__ == '__main__':
             log_dict = {'train_loss': train_loss,
                        # 'val_loss': val_loss,
                        'lr': scheduler.optimizer.param_groups[0]["lr"]}
-            for gnn_l in range(train_gaps.shape[1]):
-                log_dict[f'train_obj_gap_l{gnn_l}_mean'] = train_gaps[:, gnn_l].mean()
+            # for gnn_l in range(train_gaps.shape[1]):
+            #     log_dict[f'train_obj_gap_l{gnn_l}_mean'] = train_gaps[:, gnn_l].mean()
                 # log_dict[f'train_obj_gap_l{gnn_l}'] = wandb.Histogram(train_gaps[:, gnn_l])
             for gnn_l in range(val_gaps.shape[1]):
                 log_dict[f'val_obj_gap_l{gnn_l}_mean'] = val_gaps[:, gnn_l].mean()
                 # log_dict[f'val_obj_gap_l{gnn_l}'] = wandb.Histogram(val_gaps[:, gnn_l])
-            for gnn_l in range(train_constraint_gap.shape[1]):
-                log_dict[f'train_cons_gap_l{gnn_l}_mean'] = train_constraint_gap[:, gnn_l].mean()
+            # for gnn_l in range(train_constraint_gap.shape[1]):
+            #     log_dict[f'train_cons_gap_l{gnn_l}_mean'] = train_constraint_gap[:, gnn_l].mean()
                 # log_dict[f'train_cons_gap_l{gnn_l}'] = wandb.Histogram(train_constraint_gap[:, gnn_l])
             for gnn_l in range(val_constraint_gap.shape[1]):
                 log_dict[f'val_cons_gap_l{gnn_l}_mean'] = val_constraint_gap[:, gnn_l].mean()
