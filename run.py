@@ -31,7 +31,7 @@ def args_parser():
     parser.add_argument('--ipm_steps', type=int, default=8)
     parser.add_argument('--ipm_alpha', type=float, default=0.9)
     parser.add_argument('--normalize_dataset', type=str, default='false')  # does not help
-    parser.add_argument('--upper', type=float, default=None)
+    parser.add_argument('--upper', type=float, default=1.0)
 
     # training dynamics
     parser.add_argument('--runs', type=int, default=1)
@@ -47,15 +47,14 @@ def args_parser():
 
     # model related
     parser.add_argument('--conv', type=str, default='genconv')
-    parser.add_argument('--lappe', type=int, default=5)
+    parser.add_argument('--lappe', type=int, default=0)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--num_conv_layers', type=int, default=8)
     parser.add_argument('--num_pred_layers', type=int, default=2)
     parser.add_argument('--num_mlp_layers', type=int, default=2, help='mlp layers within GENConv')
-    parser.add_argument('--use_bipartite', type=str, default='false')
     parser.add_argument('--share_conv_weight', type=str, default='false')
-    parser.add_argument('--share_lin_weight', type=str, default='true')
-    parser.add_argument('--conv_sequence', type=str, default='parallel')
+    parser.add_argument('--share_lin_weight', type=str, default='false')
+    parser.add_argument('--conv_sequence', type=str, default='cov')
 
     # loss related
     parser.add_argument('--loss', type=str, default='primal+objgap+constraint')
@@ -127,27 +126,19 @@ if __name__ == '__main__':
 
     for run in range(args.runs):
         os.mkdir(os.path.join(log_folder_name, f'run{run}'))
-        if args.use_bipartite:
-            raise NotImplementedError
-            # model = BipartiteHeteroGNN(in_shape=2,
-            #                            pe_dim=args.lappe,
-            #                            hid_dim=args.hidden,
-            #                            num_layers=args.ipm_steps,
-            #                            use_norm=args.use_norm).to(device)
-        else:
-            model = TripartiteHeteroGNN(conv=args.conv,
-                                        in_shape=2,
-                                        pe_dim=args.lappe,
-                                        hid_dim=args.hidden,
-                                        num_conv_layers=args.num_conv_layers,
-                                        num_pred_layers=args.num_pred_layers,
-                                        num_mlp_layers=args.num_mlp_layers,
-                                        dropout=args.dropout,
-                                        share_conv_weight=args.share_conv_weight,
-                                        share_lin_weight=args.share_lin_weight,
-                                        use_norm=args.use_norm,
-                                        use_res=args.use_res,
-                                        conv_sequence=args.conv_sequence).to(device)
+        model = TripartiteHeteroGNN(conv=args.conv,
+                                    in_shape=2,
+                                    pe_dim=args.lappe,
+                                    hid_dim=args.hidden,
+                                    num_conv_layers=args.num_conv_layers,
+                                    num_pred_layers=args.num_pred_layers,
+                                    num_mlp_layers=args.num_mlp_layers,
+                                    dropout=args.dropout,
+                                    share_conv_weight=args.share_conv_weight,
+                                    share_lin_weight=args.share_lin_weight,
+                                    use_norm=args.use_norm,
+                                    use_res=args.use_res,
+                                    conv_sequence=args.conv_sequence).to(device)
         
         # wandb.watch(model, log="all", log_freq=10)
 

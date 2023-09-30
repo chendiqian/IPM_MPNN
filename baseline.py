@@ -33,7 +33,7 @@ def args_parser():
     parser.add_argument('--ipm_restarts', type=int, default=1)  # more does not help
     parser.add_argument('--ipm_steps', type=int, default=1)
     parser.add_argument('--normalize_dataset', type=str, default='false')  # does not help
-    parser.add_argument('--upper', type=float, default=None)
+    parser.add_argument('--upper', type=float, default=1.0)
 
     # training dynamics
     parser.add_argument('--runs', type=int, default=1)
@@ -51,13 +51,13 @@ def args_parser():
 
     # model related
     parser.add_argument('--conv', type=str, default='genconv')
-    parser.add_argument('--lappe', type=int, default=5)
+    parser.add_argument('--lappe', type=int, default=0)
     parser.add_argument('--hidden', type=int, default=128)
     parser.add_argument('--num_conv_layers', type=int, default=8)
     parser.add_argument('--num_pred_layers', type=int, default=2)
     parser.add_argument('--num_mlp_layers', type=int, default=2, help='mlp layers within GENConv')
     parser.add_argument('--share_conv_weight', type=str, default='false')
-    parser.add_argument('--conv_sequence', type=str, default='parallel')
+    parser.add_argument('--conv_sequence', type=str, default='cov')
 
     return parser.parse_args()
 
