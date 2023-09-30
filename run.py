@@ -168,14 +168,14 @@ if __name__ == '__main__':
 
                 # metric to cache the best model
                 cur_mean_gap = val_gaps[:, -1].mean().item()
-
+                cur_cons_gap_mean = val_constraint_gap[:, -1].mean().item()
                 if scheduler is not None:
                     scheduler.step(cur_mean_gap)
 
                 if trainer.best_val_objgap > cur_mean_gap:
                     trainer.patience = 0
                     trainer.best_val_objgap = cur_mean_gap
-                    trainer.best_val_consgap = val_constraint_gap[:, -1].mean().item()
+                    trainer.best_val_consgap = cur_cons_gap_mean
                     torch.save(model.state_dict(), os.path.join(log_folder_name, f'run{run}', 'best_model.pt'))
                 else:
                     trainer.patience += 1
@@ -185,21 +185,25 @@ if __name__ == '__main__':
 
             pbar.set_postfix({'train_loss': train_loss,
                               # 'val_loss': val_loss,
+                              'val_obj': cur_mean_gap,
+                              'val_cons': cur_cons_gap_mean,
                               'lr': scheduler.optimizer.param_groups[0]["lr"]})
             log_dict = {'train_loss': train_loss,
                        # 'val_loss': val_loss,
+                        'val_obj_gap_last_mean': cur_mean_gap,
+                        'val_cons_gap_last_mean': cur_cons_gap_mean,
                        'lr': scheduler.optimizer.param_groups[0]["lr"]}
             # for gnn_l in range(train_gaps.shape[1]):
             #     log_dict[f'train_obj_gap_l{gnn_l}_mean'] = train_gaps[:, gnn_l].mean()
                 # log_dict[f'train_obj_gap_l{gnn_l}'] = wandb.Histogram(train_gaps[:, gnn_l])
-            for gnn_l in range(val_gaps.shape[1]):
-                log_dict[f'val_obj_gap_l{gnn_l}_mean'] = val_gaps[:, gnn_l].mean()
+            # for gnn_l in range(val_gaps.shape[1]):
+            #     log_dict[f'val_obj_gap_l{gnn_l}_mean'] = val_gaps[:, gnn_l].mean()
                 # log_dict[f'val_obj_gap_l{gnn_l}'] = wandb.Histogram(val_gaps[:, gnn_l])
             # for gnn_l in range(train_constraint_gap.shape[1]):
             #     log_dict[f'train_cons_gap_l{gnn_l}_mean'] = train_constraint_gap[:, gnn_l].mean()
                 # log_dict[f'train_cons_gap_l{gnn_l}'] = wandb.Histogram(train_constraint_gap[:, gnn_l])
-            for gnn_l in range(val_constraint_gap.shape[1]):
-                log_dict[f'val_cons_gap_l{gnn_l}_mean'] = val_constraint_gap[:, gnn_l].mean()
+            # for gnn_l in range(val_constraint_gap.shape[1]):
+            #     log_dict[f'val_cons_gap_l{gnn_l}_mean'] = val_constraint_gap[:, gnn_l].mean()
                 # log_dict[f'val_cons_gap_l{gnn_l}'] = wandb.Histogram(val_constraint_gap[:, gnn_l])
             wandb.log(log_dict)
         # best_val_losses.append(trainer.best_val_loss)
