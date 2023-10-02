@@ -3,6 +3,7 @@ import torch.nn.functional as F
 
 from models.genconv import GENConv
 from models.gcnconv import GCNConv
+from models.ginconv import GINEConv
 from models.utils import MLP
 from models.hetero_conv import HeteroConv
 
@@ -59,6 +60,14 @@ def get_conv_layer(conv: str,
     elif conv.lower() == 'gcnconv':
         def get_conv():
             return GCNConv(in_dim=2 * hid_dim,
+                           edge_dim=1,
+                           hid_dim=hid_dim,
+                           num_mlp_layers=num_mlp_layers,
+                           norm='batch' if use_norm else None,
+                           in_place=in_place)
+    elif conv.lower() == 'ginconv':
+        def get_conv():
+            return GINEConv(in_dim=2 * hid_dim,
                            edge_dim=1,
                            hid_dim=hid_dim,
                            num_mlp_layers=num_mlp_layers,
