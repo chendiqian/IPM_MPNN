@@ -2,6 +2,7 @@ import argparse
 import os
 from functools import partial
 
+import copy
 import numpy as np
 import torch
 import wandb
@@ -36,6 +37,7 @@ def args_parser():
     parser.add_argument('--upper', type=float, default=1.0)
 
     # training dynamics
+    parser.add_argument('--ckpt', type=str, default='true')
     parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--lr', type=float, default=1.e-3)
     parser.add_argument('--weight_decay', type=float, default=0.)
@@ -70,13 +72,14 @@ if __name__ == '__main__':
     # Be careful when generating instances
     using_ineq_instance = os.path.split(args.datapath)[-1].startswith('ineq')
 
-    if not os.path.isdir('logs'):
-        os.mkdir('logs')
-    exist_runs = [d for d in os.listdir('logs') if d.startswith('exp')]
-    log_folder_name = f'logs/exp{len(exist_runs)}'
-    os.mkdir(log_folder_name)
-    with open(os.path.join(log_folder_name, 'config.yaml'), 'w') as outfile:
-        yaml.dump(args.to_dict(), outfile, default_flow_style=False)
+    if args.ckpt:
+        if not os.path.isdir('logs'):
+            os.mkdir('logs')
+        exist_runs = [d for d in os.listdir('logs') if d.startswith('exp')]
+        log_folder_name = f'logs/exp{len(exist_runs)}'
+        os.mkdir(log_folder_name)
+        with open(os.path.join(log_folder_name, 'config.yaml'), 'w') as outfile:
+            yaml.dump(args.to_dict(), outfile, default_flow_style=False)
 
     wandb.init(project=args.wandbproject,
                name=args.wandbname if args.wandbname else None,
@@ -120,7 +123,8 @@ if __name__ == '__main__':
     test_consgap_mean = []
 
     for run in range(args.runs):
-        os.mkdir(os.path.join(log_folder_name, f'run{run}'))
+        if args.ckpt:
+            os.mkdir(os.path.join(log_folder_name, f'run{run}'))
         model = TimeDependentTripartiteHeteroGNN(conv=args.conv,
                                                  in_shape=2,
                                                  pe_dim=args.lappe,
@@ -134,6 +138,7 @@ if __name__ == '__main__':
                                                  use_res=args.use_res,
                                                  conv_sequence=args.conv_sequence).to(device)
         model = replace_all_batch_norm_modules_(model)
+        best_model = copy.deepcopy(model.state_dict())
 
         optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=50, min_lr=1.e-5)
@@ -214,7 +219,9 @@ if __name__ == '__main__':
                 trainer.patience = 0
                 trainer.best_val_objgap = cur_mean_gap
                 trainer.best_val_consgap = cur_cons_mean_gap
-                torch.save(model.state_dict(), os.path.join(log_folder_name, f'run{run}', 'best_model.pt'))
+                best_model = copy.deepcopy(model.state_dict())
+                if args.ckpt:
+                    torch.save(model.state_dict(), os.path.join(log_folder_name, f'run{run}', 'best_model.pt'))
             else:
                 trainer.patience += 1
 
@@ -233,7 +240,7 @@ if __name__ == '__main__':
         best_val_objgap_mean.append(trainer.best_val_objgap)
         best_val_consgap_mean.append(trainer.best_val_consgap)
 
-        model.load_state_dict(torch.load(os.path.join(log_folder_name, f'run{run}', 'best_model.pt'), map_location=device))
+        model.load_state_dict(best_model)
 
         test_obj_gaps, test_constraint_gaps = trainer.eval_baseline(test_loader, model, args.T)
         test_objgap_mean.append(test_obj_gaps.mean().item())
@@ -243,13 +250,8 @@ if __name__ == '__main__':
         wandb.log({'test_consgap': test_consgap_mean[-1]})
 
     wandb.log({
-        # 'best_val_loss': np.mean(best_val_losses),
-        'best_val_objgap': np.mean(best_val_objgap_mean),
-        # 'test_loss_mean': np.mean(test_losses),
-        # 'test_loss_std': np.std(test_losses),
         'test_objgap_mean': np.mean(test_objgap_mean),
         'test_objgap_std': np.std(test_objgap_mean),
         'test_consgap_mean': np.mean(test_consgap_mean),
         'test_consgap_std': np.std(test_consgap_mean),
-        'test_hybrid_gap': np.mean(test_objgap_mean) + np.mean(test_consgap_mean),  # for the sweep
     })
