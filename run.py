@@ -15,7 +15,7 @@ import wandb
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
 from data.dataset import SetCoverDataset
 from data.utils import args_set_bool, collate_fn_ip
-from models.hetero_gnn import TripartiteHeteroGNN
+from models.hetero_gnn import TripartiteHeteroGNN, BipartiteHeteroGNN
 from trainer import Trainer
 
 
@@ -48,6 +48,7 @@ def args_parser():
     parser.add_argument('--use_res', type=str, default='false')  # does not help
 
     # model related
+    parser.add_argument('--bipartite', type=str, default='false')
     parser.add_argument('--conv', type=str, default='genconv')
     parser.add_argument('--lappe', type=int, default=0)
     parser.add_argument('--hidden', type=int, default=128)
@@ -130,19 +131,33 @@ if __name__ == '__main__':
     for run in range(args.runs):
         if args.ckpt:
             os.mkdir(os.path.join(log_folder_name, f'run{run}'))
-        model = TripartiteHeteroGNN(conv=args.conv,
-                                    in_shape=2,
-                                    pe_dim=args.lappe,
-                                    hid_dim=args.hidden,
-                                    num_conv_layers=args.num_conv_layers,
-                                    num_pred_layers=args.num_pred_layers,
-                                    num_mlp_layers=args.num_mlp_layers,
-                                    dropout=args.dropout,
-                                    share_conv_weight=args.share_conv_weight,
-                                    share_lin_weight=args.share_lin_weight,
-                                    use_norm=args.use_norm,
-                                    use_res=args.use_res,
-                                    conv_sequence=args.conv_sequence).to(device)
+        if args.bipartite:
+            model = BipartiteHeteroGNN(conv=args.conv,
+                                       in_shape=2,
+                                       pe_dim=args.lappe,
+                                       hid_dim=args.hidden,
+                                       num_conv_layers=args.num_conv_layers,
+                                       num_pred_layers=args.num_pred_layers,
+                                       num_mlp_layers=args.num_mlp_layers,
+                                       dropout=args.dropout,
+                                       share_conv_weight=args.share_conv_weight,
+                                       share_lin_weight=args.share_lin_weight,
+                                       use_norm=args.use_norm,
+                                       use_res=args.use_res).to(device)
+        else:
+            model = TripartiteHeteroGNN(conv=args.conv,
+                                        in_shape=2,
+                                        pe_dim=args.lappe,
+                                        hid_dim=args.hidden,
+                                        num_conv_layers=args.num_conv_layers,
+                                        num_pred_layers=args.num_pred_layers,
+                                        num_mlp_layers=args.num_mlp_layers,
+                                        dropout=args.dropout,
+                                        share_conv_weight=args.share_conv_weight,
+                                        share_lin_weight=args.share_lin_weight,
+                                        use_norm=args.use_norm,
+                                        use_res=args.use_res,
+                                        conv_sequence=args.conv_sequence).to(device)
         best_model = copy.deepcopy(model.state_dict())
 
         optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
