@@ -32,7 +32,6 @@ def args_parser():
     parser.add_argument('--upper', type=float, default=1.0)
 
     # training dynamics
-    parser.add_argument('--runs', type=int, default=1)
     parser.add_argument('--batchsize', type=int, default=16)
     parser.add_argument('--dropout', type=float, default=0.)  # must
     parser.add_argument('--use_norm', type=str, default='true')  # must
@@ -115,8 +114,9 @@ if __name__ == '__main__':
                       loss_weight=None,
                       using_ineq=using_ineq_instance)
 
-    for run in range(args.runs):
-        model.load_state_dict(torch.load(os.path.join(args.model_path, f'run{run}', 'best_model.pt'), map_location=device))
+    runs = [f for f in os.listdir(args.model_path) if os.path.isdir(os.path.join(args.model_path, f)) and f.startswith('run')]
+    for run in runs:
+        model.load_state_dict(torch.load(os.path.join(args.model_path, run, 'best_model.pt'), map_location=device))
         model.eval()
         with torch.no_grad():
             # test_loss = trainer.eval(test_loader, model, None)
