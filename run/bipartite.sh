@@ -3,16 +3,16 @@
 ### GENConv
 
 ### setcover
-python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0. --weight_decay 1.2e-6 --batchsize 512 --hidden 180 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --conv_sequence cov --loss_weight_x 1.2 --loss_weight_obj 0.8 --loss_weight_cons 0.16 --runs 3 --bipartite true
+python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.82 --weight_decay 1.e-6 --batchsize 512 --hidden 32 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 2.6 --loss_weight_cons 0.77 --runs 3 --conv genconv --bipartite true
 
 ### indset
-python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0. --weight_decay 1.2e-6 --upper 1. --use_wandb true --batchsize 512 --hidden 180 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --conv_sequence cov --loss_weight_x 1.2 --loss_weight_obj 0.8 --loss_weight_cons 0.16 --runs 3 --bipartite true
+python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.62 --weight_decay 0. --batchsize 512 --hidden 180 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 4.7 --loss_weight_cons 2.0 --runs 3 --conv genconv --bipartite true
 
 ### cauction
-python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0. --weight_decay 1.6e-8 --upper 1. --use_wandb true --batchsize 256 --micro_batch 2 --hidden 180 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --conv_sequence cov --loss_weight_x 1. --loss_weight_obj 2.17 --loss_weight_cons 4.72 --runs 3 --bipartite true
+python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.86 --weight_decay 0. --batchsize 128 --hidden 180 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 4.6 --loss_weight_cons 5.3 --runs 3 --conv genconv --bipartite true
 
 ### fac
-python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0. --weight_decay 3.8e-6 --upper 1. --use_wandb true --batchsize 256 --micro_batch 2 --hidden 180 --num_pred_layers 4 --num_mlp_layers 2 --share_lin_weight false --conv_sequence cov --loss_weight_x 1. --loss_weight_obj 2.99 --loss_weight_cons 8.15 --runs 3 --bipartite true
+python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.87 --weight_decay 1.e-7 --batchsize 512 --hidden 128 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 2.86 --loss_weight_cons 2.48 --runs 3 --conv genconv --bipartite true
 
 ### GCNConv
 
