@@ -9,7 +9,7 @@ python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.82 --weight_decay 
 python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.62 --weight_decay 0. --batchsize 512 --hidden 180 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 4.7 --loss_weight_cons 2.0 --runs 3 --conv genconv --bipartite true
 
 ### cauction
-python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.86 --weight_decay 0. --batchsize 128 --hidden 180 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 4.6 --loss_weight_cons 5.3 --runs 3 --conv genconv --bipartite true
+python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.53 --weight_decay 1.e-7 --batchsize 512  --hidden 128 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 6.15 --loss_weight_cons 6.62 --runs 3 --conv genconv --bipartite true
 
 ### fac
 python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.87 --weight_decay 1.e-7 --batchsize 512 --hidden 128 --num_pred_layers 4 --num_mlp_layers 4 --share_lin_weight false --loss_weight_x 1. --loss_weight_obj 2.86 --loss_weight_cons 2.48 --runs 3 --conv genconv --bipartite true
