@@ -9,7 +9,7 @@ import torch
 from torch_geometric.data import Batch, HeteroData, InMemoryDataset
 from torch_sparse import SparseTensor
 
-from scipy_solver.linprog import linprog
+from solver.linprog import linprog
 from tqdm import tqdm
 
 
