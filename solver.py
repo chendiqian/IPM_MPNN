@@ -1,15 +1,11 @@
-import warnings
 from collections import namedtuple
 from copy import deepcopy
 
 import numpy as np
-from scipy.linalg import LinAlgError
-from scipy.linalg import cho_factor, cho_solve, lstsq
+from scipy.linalg import cho_factor, cho_solve
 from scipy.optimize._linprog_util import _clean_inputs, _presolve, _get_Abc, _autoscale, \
     _postsolve
-from scipy.sparse.linalg import cg as sp_cg
 from scipy.sparse import csr_matrix
-import numba
 from tqdm import tqdm
 
 # https://github.com/scipy/scipy/blob/e574cbcabf8d25955d1aafeed02794f8b5f250cd/scipy/optimize/_linprog_util.py#L15
@@ -58,10 +54,9 @@ def _get_blind_start(A, b, c, smart_start = True):
     return x0, lambda0, s0
 
 
-@numba.njit(cache=True)
 def conjugate_gradient(P, q, max_iters = 10000, tol = 1.e-5):
 
-    y = q / np.diag(P)
+    y = q / P.diagonal()
 
     for i in range(1, max_iters + 1):
         r = q - P @ y
@@ -88,10 +83,7 @@ def ipm_overleaf(c,
                  autoscale = False,
                  max_iter=100000,
                  tol = 1.e-9,
-                 lin_solver='cg',
-                 step_method='line',
-                 sigma=0.3,
-                 gamma=0.1):
+                 sigma=0.3):
     lp = _LPProblem(c, A_ub, b_ub, A_eq, b_eq, bounds, None, None)
 
     # `_parse_linprog` contains `_check_sparse_inputs` and `_clean_inputs`
@@ -126,63 +118,40 @@ def ipm_overleaf(c,
     
     intermediate_xs = []
 
-    pbar = tqdm(range(max_iter))
+    pbar = range(max_iter)
     for iteration in pbar:
-        try:
-            s_inv = (s + SMALL_EPS) ** -1
-            xs_inv = x * s_inv
-            A_XS_inv = A * xs_inv[None]
-            M = A_XS_inv @ A.T
+        s_inv = (s + SMALL_EPS) ** -1
+        xs_inv = x * s_inv
+        A_XS_inv = csr_matrix(A * xs_inv[None])
+        M = A_XS_inv @ A_sparse.T
+        rhs = b - A_sparse @ x + A_XS_inv @ (- A_sparse.T @ lambd + c) - A_sparse @ s_inv * sigma * _mu
 
-            rhs = b - A_sparse @ x + A_XS_inv @ (- A_sparse.T @ lambd + c) - A_sparse @ s_inv * sigma * _mu
-            if lin_solver == 'cho':
-                c_and_lower = cho_factor(M)
-                grad_lambda = cho_solve(c_and_lower, rhs)
-                lin_system_steps = 0
-            elif lin_solver == 'lstsq':
-                grad_lambda = lstsq(M, rhs)[0]
-                lin_system_steps = 0
-            elif lin_solver == 'cg':
-                grad_lambda, lin_system_steps = conjugate_gradient(M, rhs, max_iters = 100000, tol=1.e-5)
-            elif lin_solver == 'scipy_cg':
-                grad_lambda = sp_cg(M, rhs, tol=1.e-9)
-                lin_system_steps = 0
-            else:
-                raise NotImplementedError
+        # conjugate gradient solve M @ x = rhs
+        grad_lambda, lin_system_steps = conjugate_gradient(M, rhs, max_iters = 100000, tol=1.e-5)
 
-            AT_lambda_plut_dlambda = A_sparse.T @ (lambd + grad_lambda)
-            grad_s = - AT_lambda_plut_dlambda - s + c
-            grad_x = s_inv * sigma * _mu + xs_inv * (AT_lambda_plut_dlambda - c)
+        AT_lambda_plut_dlambda = A_sparse.T @ (lambd + grad_lambda)
+        grad_s = - AT_lambda_plut_dlambda - s + c
+        grad_x = s_inv * sigma * _mu + xs_inv * (AT_lambda_plut_dlambda - c)
 
-            if step_method == 'conv':
-                alpha = min(1., 2 ** 1.5 / len(x) * (1 - gamma) * sigma / (sigma ** 2 / gamma - 2 * sigma + 1))
-                alpha_x = alpha_l = alpha_s = alpha
-            elif step_method == 'line':
-                alpha = 1.
-                gradx_mask = grad_x < 0
-                if np.any(gradx_mask):
-                    alpha = min(alpha, (-x[gradx_mask] / grad_x[gradx_mask]).min())
-                grads_mask = grad_s < 0
-                if np.any(grads_mask):
-                    alpha = min(alpha, (-s[grads_mask] / grad_s[grads_mask]).min())
-                alpha_l = alpha_s = alpha_x = alpha
-            else:
-                raise ValueError
+        alpha = 1.
+        gradx_mask = grad_x < 0
+        if np.any(gradx_mask):
+            alpha = min(alpha, (-x[gradx_mask] / grad_x[gradx_mask]).min())
+        grads_mask = grad_s < 0
+        if np.any(grads_mask):
+            alpha = min(alpha, (-s[grads_mask] / grad_s[grads_mask]).min())
+        alpha_l = alpha_s = alpha_x = alpha
 
-            x = x + alpha_x * grad_x
-            lambd = lambd + alpha_l * grad_lambda
-            s = s + alpha_s * grad_s
-            _mu = mu(x, s)
+        x = x + alpha_x * grad_x
+        lambd = lambd + alpha_l * grad_lambda
+        s = s + alpha_s * grad_s
+        _mu = mu(x, s)
 
-            if np.abs(x - last_x).max() < tol:
-                break
-            last_x = x
-            intermediate_xs.append(_postsolve(x, postsolve_args)[0])
-        except (LinAlgError, FloatingPointError, ValueError, ZeroDivisionError):
-            warnings.warn(f'Instability occured at iter {iteration}, turning to lstsq')
-            lin_solver = 'lstsq'
-
-        pbar.set_postfix({'lin_system_steps': lin_system_steps})
+        if np.abs(x - last_x).max() < tol:
+            break
+        last_x = x
+        intermediate_xs.append(_postsolve(x, postsolve_args)[0])
+        # pbar.set_postfix({'lin_system_steps': lin_system_steps})
 
     x, fun, slack, con = _postsolve(x, postsolve_args)
     sol = {
