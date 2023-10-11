@@ -26,7 +26,7 @@ python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.78 --weight_decay 
 python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.78 --weight_decay 2.1e-6 --ipm_steps 3 --num_conv_layers 3 --batchsize 512 --hidden 180 --num_pred_layers 2 --num_mlp_layers 4 --loss_weight_x 1. --loss_weight_obj 3.53 --loss_weight_cons 5.61 --runs 3 --conv gcnconv
 
 ### cauc
-python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 65 --weight_decay 3.7e-6 --ipm_steps 3 --num_conv_layers 3 --batchsize 512 --hidden 180 --num_pred_layers 4 --num_mlp_layers 3 --loss_weight_x 1. --loss_weight_obj 4.66 --loss_weight_cons 5.01 --runs 3 --conv gcnconv
+python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.65 --weight_decay 3.7e-6 --ipm_steps 3 --num_conv_layers 3 --batchsize 512 --hidden 180 --num_pred_layers 4 --num_mlp_layers 3 --loss_weight_x 1. --loss_weight_obj 4.66 --loss_weight_cons 5.01 --runs 3 --conv gcnconv
 
 ### fac
 python run.py --datapath DATA_TO_YOUR_INSTANCES --ipm_alpha 0.83 --weight_decay 9.2e-6 --ipm_steps 3 --num_conv_layers 3 --batchsize 512 --hidden 128 --num_pred_layers 4 --num_mlp_layers 2 --loss_weight_x 1. --loss_weight_obj 2.98 --loss_weight_cons 3.71 --runs 3 --conv gcnconv
