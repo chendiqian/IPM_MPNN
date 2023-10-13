@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from torch_geometric.transforms import Compose
 
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
-from data.dataset import SetCoverDataset
+from data.dataset import LPDataset
 from data.utils import args_set_bool, collate_fn_ip
 from models.hetero_gnn import TripartiteHeteroGNN
 from trainer import Trainer
@@ -28,7 +28,6 @@ def args_parser():
     # ipm processing
     parser.add_argument('--ipm_restarts', type=int, default=1)
     parser.add_argument('--ipm_steps', type=int, default=8)
-    parser.add_argument('--normalize_dataset', type=str, default='false')
     parser.add_argument('--upper', type=float, default=1.0)
 
     # training dynamics
@@ -57,25 +56,20 @@ if __name__ == '__main__':
     args = ConfigDict(args)
     logging.basicConfig(level=logging.INFO)
 
-    # Be careful when generating instances
-    using_ineq_instance = os.path.split(args.datapath)[-1].startswith('ineq')
-
     wandb.init(project=args.wandbproject,
                name=args.wandbname if args.wandbname else None,
                mode="online" if args.use_wandb else "disabled",
                config=vars(args),
                entity="chendiqian")  # use your own entity
 
-    dataset = SetCoverDataset(args.datapath,
-                              extra_path=f'{args.ipm_restarts}restarts_'
+    dataset = LPDataset(args.datapath,
+                        extra_path=f'{args.ipm_restarts}restarts_'
                                          f'{args.lappe}lap_'
                                          f'{args.ipm_steps}steps'
                                          f'{"_upper_" + str(args.upper) if args.upper is not None else ""}',
-                              using_ineq=using_ineq_instance,
-                              upper_bound=args.upper,
-                              normalize=args.normalize_dataset,
-                              rand_starts=args.ipm_restarts,
-                              pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
+                        upper_bound=args.upper,
+                        rand_starts=args.ipm_restarts,
+                        pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(args.ipm_steps)]))
 
     test_loader = DataLoader(dataset,
@@ -107,12 +101,10 @@ if __name__ == '__main__':
     trainer = Trainer(device,
                       'primal',
                       'l2',
-                      dataset.mean, dataset.std,
                       1,
                       min(args.ipm_steps, args.num_conv_layers),
                       1.,
-                      loss_weight=None,
-                      using_ineq=using_ineq_instance)
+                      loss_weight=None)
 
     runs = [f for f in os.listdir(args.model_path) if os.path.isdir(os.path.join(args.model_path, f)) and f.startswith('run')]
     for run in runs:

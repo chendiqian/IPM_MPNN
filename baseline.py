@@ -17,7 +17,7 @@ from tqdm import tqdm
 
 from trainer import Trainer
 from data.data_preprocess import HeteroAddLaplacianEigenvectorPE, SubSample
-from data.dataset import SetCoverDataset
+from data.dataset import LPDataset
 from data.utils import args_set_bool, collate_fn_with_counts
 from models.time_depend_gnn import TimeDependentTripartiteHeteroGNN
 
@@ -32,8 +32,7 @@ def args_parser():
 
     # ipm processing
     parser.add_argument('--ipm_restarts', type=int, default=1)  # more does not help
-    parser.add_argument('--ipm_steps', type=int, default=1)
-    parser.add_argument('--normalize_dataset', type=str, default='false')  # does not help
+    parser.add_argument('--ipm_steps', type=int, default=3)
     parser.add_argument('--upper', type=float, default=1.0)
 
     # training dynamics
@@ -55,7 +54,7 @@ def args_parser():
     parser.add_argument('--conv', type=str, default='genconv')
     parser.add_argument('--lappe', type=int, default=0)
     parser.add_argument('--hidden', type=int, default=128)
-    parser.add_argument('--num_conv_layers', type=int, default=8)
+    parser.add_argument('--num_conv_layers', type=int, default=3)
     parser.add_argument('--num_pred_layers', type=int, default=2)
     parser.add_argument('--num_mlp_layers', type=int, default=2, help='mlp layers within GENConv')
     parser.add_argument('--share_conv_weight', type=str, default='false')
@@ -68,9 +67,6 @@ if __name__ == '__main__':
     args = args_parser()
     args = args_set_bool(vars(args))
     args = ConfigDict(args)
-
-    # Be careful when generating instances
-    using_ineq_instance = os.path.split(args.datapath)[-1].startswith('ineq')
 
     if args.ckpt:
         if not os.path.isdir('logs'):
@@ -87,16 +83,14 @@ if __name__ == '__main__':
                config=vars(args),
                entity="chendiqian")  # use your own entity
 
-    dataset = SetCoverDataset(args.datapath,
-                              extra_path=f'{args.ipm_restarts}restarts_'
+    dataset = LPDataset(args.datapath,
+                        extra_path=f'{args.ipm_restarts}restarts_'
                                          f'{args.lappe}lap_'
                                          f'{args.ipm_steps}steps'
                                          f'{"_upper_" + str(args.upper) if args.upper is not None else ""}',
-                              using_ineq=using_ineq_instance,
-                              upper_bound=args.upper,
-                              normalize=args.normalize_dataset,
-                              rand_starts=args.ipm_restarts,
-                              pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
+                        upper_bound=args.upper,
+                        rand_starts=args.ipm_restarts,
+                        pre_transform=Compose([HeteroAddLaplacianEigenvectorPE(k=args.lappe),
                                                      SubSample(args.ipm_steps)]))
 
     train_loader = DataLoader(dataset[:int(len(dataset) * 0.8)],
@@ -146,12 +140,10 @@ if __name__ == '__main__':
         trainer = Trainer(device,
                           '',
                           'l2',
-                          dataset.mean, dataset.std,
                           args.micro_batch,
                           min(args.ipm_steps, args.num_conv_layers),
                           1.,
-                          loss_weight=None,
-                          using_ineq=using_ineq_instance)
+                          loss_weight=None)
 
         pbar = tqdm(range(args.epochs))
         for epoch in pbar:

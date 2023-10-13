@@ -12,16 +12,12 @@ class Trainer:
                  device,
                  loss_target,
                  loss_type,
-                 mean,
-                 std,
                  micro_batch,
                  ipm_steps,
                  ipm_alpha,
-                 loss_weight,
-                 using_ineq):
+                 loss_weight):
         assert 0. <= ipm_alpha <= 1.
         self.ipm_steps = ipm_steps
-        self.using_ineq = using_ineq
         self.step_weight = torch.tensor([ipm_alpha ** (ipm_steps - l - 1)
                                          for l in range(ipm_steps)],
                                         dtype=torch.float, device=device)[None]
@@ -38,8 +34,6 @@ class Trainer:
             self.loss_func = torch.abs
         else:
             raise ValueError
-        self.mean = mean
-        self.std = std
         self.micro_batch = micro_batch
 
     def train(self, dataloader, model, optimizer):
@@ -98,7 +92,7 @@ class Trainer:
         loss = 0.
 
         if 'obj' in self.loss_target:
-            pred = vals[:, -self.ipm_steps:] * self.std + self.mean
+            pred = vals[:, -self.ipm_steps:]
             c_times_x = data.obj_const[:, None] * pred
             obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
             obj_pred = (self.loss_func(obj_pred) * self.step_weight).mean()
@@ -135,23 +129,21 @@ class Trainer:
         :param data:
         :return:
         """
-        pred = vals[:, -self.ipm_steps:] * self.std + self.mean
+        pred = vals[:, -self.ipm_steps:]
         Ax = scatter(pred[data.A_col, :] * data.A_val[:, None], data.A_row, reduce='sum', dim=0)
         constraint_gap = Ax - data.rhs[:, None]
-        if self.using_ineq:
-            # Ax - b <= 0 will not be punished
-            constraint_gap = torch.relu(constraint_gap)
+        constraint_gap = torch.relu(constraint_gap)
         return constraint_gap
 
     def get_obj_metric(self, data, pred, hard_non_negative=False):
         # if hard_non_negative, we need a relu to make x all non-negative
         # just for metric usage, not for training
-        pred = pred[:, -self.ipm_steps:] * self.std + self.mean
+        pred = pred[:, -self.ipm_steps:]
         if hard_non_negative:
             pred = torch.relu(pred)
         c_times_x = data.obj_const[:, None] * pred
         obj_pred = scatter(c_times_x, data['vals'].batch, dim=0, reduce='sum')
-        x_gt = data.gt_primals[:, -self.ipm_steps:] * self.std + self.mean
+        x_gt = data.gt_primals[:, -self.ipm_steps:]
         c_times_xgt = data.obj_const[:, None] * x_gt
         obj_gt = scatter(c_times_xgt, data['vals'].batch, dim=0, reduce='sum')
         return (obj_pred - obj_gt) / obj_gt
