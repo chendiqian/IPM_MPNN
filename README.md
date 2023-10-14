@@ -1,3 +1,9 @@
+# Proposed architecture
+<img src="https://github.com/chendiqian/IPM_MPNN/blob/master/overview.jpg" alt="drawing" width="900"/>
+<p align="center">
+An overview of our IPM-MPNN
+</p>
+
 # Environment setup
 
 Simply install from the existing file `conda env create -f environment.yml` or install the required envs manually:
