@@ -1,4 +1,4 @@
-# Proposed architecture
+# IPM-GNN: Exploring the Power of Graph Neural Networks in Solving Linear Optimization Problems
 <img src="https://github.com/chendiqian/IPM_MPNN/blob/master/overview.jpg" alt="drawing" width="900"/>
 <p align="center">
 An overview of our IPM-MPNN
