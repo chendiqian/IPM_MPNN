@@ -1,6 +1,6 @@
 # IPM-GNN: Exploring the Power of Graph Neural Networks in Solving Linear Optimization Problems
 
-[![arXiv](https://img.shields.io/badge/arXiv-2302.04181-b31b1b.svg)](https://arxiv.org/abs/2301.11039)
+[![arXiv](https://img.shields.io/badge/arXiv-2310.10603-b31b1b.svg)](https://arxiv.org/abs/2310.10603)
 
 <img src="https://github.com/chendiqian/IPM_MPNN/blob/master/overview.jpg" alt="drawing" width="900"/>
 <p align="center">
